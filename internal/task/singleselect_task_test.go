@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/qzeleza/ziva/internal/defaults"
@@ -25,6 +26,24 @@ func makeTestItems(values []string) []Item {
 		result[i] = Item{Key: v, Name: v}
 	}
 	return result
+}
+
+func longestItemNameLength(items []Item) int {
+	maxLen := 0
+	for _, item := range items {
+		if isDividerChoice(item.Key, item.Name) {
+			continue
+		}
+		trimmed := strings.TrimSpace(item.Name)
+		if trimmed == "" {
+			continue
+		}
+		length := utf8.RuneCountInString(trimmed)
+		if length > maxLen {
+			maxLen = length
+		}
+	}
+	return maxLen
 }
 
 // TestSingleSelectTaskCreation проверяет корректность создания задачи SingleSelectTask
@@ -298,4 +317,52 @@ func TestSingleSelectTaskHelpTagRendering(t *testing.T) {
 		prevLine := strings.TrimSpace(lines[hintLineIndex-1])
 		assert.NotEqual(t, "", prevLine, "Строка подсказки не должна отделяться пустой строкой")
 	}
+}
+
+func TestSingleSelectTaskDividerRecognition(t *testing.T) {
+	divider := SingleSelectDividerItem
+	items := []Item{
+		{Key: "first", Name: "Первый пункт"},
+		divider,
+		{Key: "second", Name: "Второй пункт"},
+	}
+
+	task := NewSingleSelectTask("С разделителем", items)
+
+	assert.True(t, task.isDisabled(1), "Элемент-разделитель должен быть недоступным")
+	assert.Equal(t, 0, task.cursor, "Курсор должен указывать на первый доступный пункт")
+
+	moved := task.moveCursorForward()
+	assert.True(t, moved, "Курсор должен перейти к следующему доступному пункту")
+	assert.Equal(t, 2, task.cursor, "Курсор должен пропустить разделитель")
+
+	assert.Equal(t, -1, task.choiceIndex(divider.Name), "Разделитель не должен разрешать выбор по имени")
+}
+
+func TestSingleSelectTaskDividerViewRendering(t *testing.T) {
+	divider := SingleSelectDividerItem
+	items := []Item{
+		{Key: "first", Name: "Первый пункт"},
+		divider,
+		{Key: "second", Name: "Второй пункт"},
+	}
+
+	task := NewSingleSelectTask("С разделителем", items)
+
+	view := stripANSI(task.View(80))
+	lines := strings.Split(view, "\n")
+	var dividerLine string
+	for _, line := range lines {
+		if strings.ContainsRune(line, '├') {
+			dividerLine = line
+			break
+		}
+	}
+	if assert.NotEmpty(t, dividerLine, "Вывод должен содержать строку разделителя") {
+		start := strings.IndexRune(dividerLine, '├')
+		dividerText := dividerLine[start:]
+		expectedLength := longestItemNameLength(items) + 1
+		assert.Equal(t, expectedLength, utf8.RuneCountInString(dividerText), "Разделитель должен быть на один символ длиннее самого длинного пункта")
+	}
+	assert.NotContains(t, view, "(○) ├", "Разделитель не должен отображаться как выбираемый пункт")
 }

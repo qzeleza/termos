@@ -187,6 +187,9 @@ func (t *MultiSelectTask) isDisabled(index int) bool {
 	if index < 0 || index >= len(t.items) {
 		return true
 	}
+	if t.items[index].isDivider() {
+		return true
+	}
 	_, exists := t.disabled[index]
 	return exists
 }
@@ -375,6 +378,9 @@ func (t *MultiSelectTask) choiceIndex(value string) int {
 		return -1
 	}
 	for i, item := range t.items {
+		if item.isDivider() {
+			continue
+		}
 		if strings.EqualFold(item.key, normalized) || strings.EqualFold(item.name, normalized) {
 			return i
 		}
@@ -503,6 +509,9 @@ func (t *MultiSelectTask) isSelectedRaw(index int) bool {
 	if index < 0 || index >= len(t.items) {
 		return false
 	}
+	if t.items[index].isDivider() {
+		return false
+	}
 	if len(t.items) > 32 {
 		if t.fallbackMap == nil {
 			return false
@@ -515,6 +524,9 @@ func (t *MultiSelectTask) isSelectedRaw(index int) bool {
 
 func (t *MultiSelectTask) setSelectedState(index int, active bool) bool {
 	if index < 0 || index >= len(t.items) {
+		return false
+	}
+	if t.items[index].isDivider() {
 		return false
 	}
 	current := t.isSelectedRaw(index)
@@ -1220,6 +1232,25 @@ func (t *MultiSelectTask) View(width int) string {
 		item := t.items[i]
 		label := item.displayName()
 		description := item.helpText()
+		if item.isDivider() {
+			var itemPrefix string
+			switch {
+			case t.cursor == i:
+				itemPrefix = ui.GetSelectItemPrefix("active")
+			case t.hasSelectAll && t.cursor == -1:
+				itemPrefix = ui.GetSelectItemPrefix("below")
+			case i < t.cursor:
+				itemPrefix = ui.GetSelectItemPrefix("above")
+			default:
+				itemPrefix = ui.GetSelectItemPrefix("below")
+			}
+			styledLabel := ui.DisabledStyle.Render(label)
+			sb.WriteString(fmt.Sprintf("%s%s\n", itemPrefix, styledLabel))
+			if t.cursor == i && strings.TrimSpace(description) != "" {
+				activeHelp = description
+			}
+			continue
+		}
 		checked := " "
 		var itemPrefix string
 		itemDisabled := t.isDisabled(i)

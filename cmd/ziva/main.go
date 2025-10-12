@@ -62,9 +62,11 @@ func main() {
 		{Key: componentDocs, Name: "Документация", Description: "Автоматическая генерация документации"},
 		{Key: componentBuild, Name: "Компилировать", Description: "Сборка исполняемых файлов"},
 		{Key: componentArtifacts, Name: "Выходные данные", Description: "Архивация результатов"},
+		ziva.Divider,
 		{Key: componentViewport, Name: "Область просмотра"},
 		{Key: componentInput, Name: "Поле ввода", Description: "Пример текстовой задачи"},
 		{Key: componentMulti, Name: "Мультивыбор", Description: "Дополнительные параметры"},
+		ziva.Divider,
 		{Key: componentSingle, Name: "Одиночный выбор", Description: "Переключатель режимов"},
 		{Key: componentValidation, Name: "Проверка ввода", Description: "Встроенные валидаторы"},
 		{Key: componentBack, Name: "Назад", Description: "Возврат к предыдущему шагу"},
@@ -85,8 +87,10 @@ func main() {
 		{Key: envDevelopment, Name: "development", Description: "Среда разработки"},
 		{Key: envStaging, Name: "staging", Description: "Промежуточная среда"},
 		{Key: envProduction, Name: "production", Description: "Боевая среда"},
+		ziva.Divider,
 		{Key: envCustom, Name: "другое", Description: "Пользовательское значение"},
 		{Key: envCancel, Name: "отмена", Description: "Отмена выбора"},
+		ziva.Divider,
 		{Key: envBack, Name: "назад", Description: "Вернуться к предыдущему пункту"},
 		{Key: envExit, Name: "выход", Description: "Выход из программы"},
 	}
@@ -101,7 +105,7 @@ func main() {
 	// 1) Задачи мультивыбора (без и с пунктом "Выбрать все")
 	//    Пример без "Выбрать все"
 	ms1 := ziva.NewMultiSelectTask("Выберите компоненты установки", msel).
-		WithViewport(5, false).
+		WithViewport(15, false).
 		WithTimeout(3*time.Second, []string{componentCLI, componentServer}).
 		WithItemsDisabled([]string{componentAgent, componentWeb})
 
@@ -113,7 +117,7 @@ func main() {
 	}
 
 	diagnosticsTask := ziva.NewMultiSelectTask("Настройка диагностики", diagnosticsItems).
-		WithViewport(4, true).
+		WithViewport(15, true).
 		WithDependencies(map[string]ziva.MultiSelectDependencyRule{
 			diagnosticLogging: {
 				OnSelect: ziva.MultiSelectDependencyActions{
@@ -160,7 +164,7 @@ func main() {
 	ss := ziva.NewSingleSelectTask(
 		"Выберите среду развертывания",
 		ssel,
-	).WithViewport(3).
+	).WithViewport(9).
 		// WithTimeout(3*time.Second, envStaging).
 		WithDefaultItem(envProduction)
 

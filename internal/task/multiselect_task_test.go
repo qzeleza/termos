@@ -3,7 +3,9 @@
 package task
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -222,6 +224,58 @@ func TestMultiSelectTaskWithSelectAll(t *testing.T) {
 	assert.Equal(t, 0, multiSelectTaskAfterUnselectAll.selected.Count(), "Количество выбранных элементов должно быть равно 0")
 	selectNoneView := stripANSI(multiSelectTaskAfterUnselectAll.View(80))
 	assert.Contains(t, selectNoneView, defaults.SelectAllDefaultText, "После отключения всех элементов должен отображаться текст включения")
+}
+
+func TestMultiSelectTaskDividerRecognition(t *testing.T) {
+	divider := SingleSelectDividerItem
+	items := []Item{
+		{Key: "first", Name: "Первый"},
+		divider,
+		{Key: "second", Name: "Второй пункт меню"},
+	}
+
+	task := NewMultiSelectTask("С разделителем", items)
+
+	assert.True(t, task.isDisabled(1), "Разделитель должен быть недоступным для выбора")
+	assert.Equal(t, 0, task.cursor, "Курсор должен указывать на первый доступный элемент")
+
+	task.toggleSelection(1)
+	assert.False(t, task.isSelected(1), "Разделитель не должен попадать в выбранные")
+
+	moved := task.moveCursorForward()
+	assert.True(t, moved, "Курсор должен переключиться на следующий доступный элемент")
+	assert.Equal(t, 2, task.cursor, "Курсор должен пропускать разделитель")
+
+	assert.Equal(t, -1, task.choiceIndex(divider.Name), "Разделитель не должен сопоставляться по имени")
+}
+
+func TestMultiSelectTaskDividerViewRendering(t *testing.T) {
+	divider := SingleSelectDividerItem
+	items := []Item{
+		{Key: "first", Name: "Первый пункт"},
+		divider,
+		{Key: "second", Name: "Вариант два"},
+		{Key: "third", Name: "Очень длинный пункт для проверки"},
+	}
+
+	task := NewMultiSelectTask("С разделителем", items)
+
+	view := stripANSI(task.View(100))
+	lines := strings.Split(view, "\n")
+	var dividerLine string
+	for _, line := range lines {
+		if strings.ContainsRune(line, '├') {
+			dividerLine = line
+			break
+		}
+	}
+	if assert.NotEmpty(t, dividerLine, "Вывод должен содержать строку разделителя") {
+		start := strings.IndexRune(dividerLine, '├')
+		dividerText := dividerLine[start:]
+		expectedLength := longestItemNameLength(items) + 1
+		assert.Equal(t, expectedLength, utf8.RuneCountInString(dividerText), "Разделитель должен быть на один символ длиннее самого длинного пункта")
+		assert.NotContains(t, dividerLine, "[", "Разделитель не должен содержать индикатор выбора")
+	}
 }
 
 func TestMultiSelectTaskDisabledItems(t *testing.T) {

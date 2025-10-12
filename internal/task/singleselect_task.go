@@ -136,6 +136,9 @@ func (t *SingleSelectTask) isDisabled(index int) bool {
 	if index < 0 || index >= len(t.items) {
 		return true
 	}
+	if t.items[index].isDivider() {
+		return true
+	}
 	_, exists := t.disabled[index]
 	return exists
 }
@@ -309,6 +312,9 @@ func (t *SingleSelectTask) choiceIndex(value string) int {
 		return -1
 	}
 	for i, item := range t.items {
+		if item.isDivider() {
+			continue
+		}
 		if strings.EqualFold(item.key, normalized) || strings.EqualFold(item.name, normalized) {
 			return i
 		}
@@ -580,9 +586,28 @@ func (t *SingleSelectTask) View(width int) string {
 			break
 		}
 
-		item := t.items[i]                      // Получаем элемент списка
-		label := item.displayName()             // Получаем отображаемый текст
-		description := item.helpText()          // Получаем подсказку
+		item := t.items[i]             // Получаем элемент списка
+		label := item.displayName()    // Получаем отображаемый текст
+		description := item.helpText() // Получаем подсказку
+
+		if item.isDivider() {
+			var itemPrefix string
+			switch {
+			case t.cursor == i:
+				itemPrefix = ui.GetSelectItemPrefix("active")
+			case i < t.cursor:
+				itemPrefix = ui.GetSelectItemPrefix("above")
+			default:
+				itemPrefix = ui.GetSelectItemPrefix("below")
+			}
+			styledLabel := ui.DisabledStyle.Render(label)
+			sb.WriteString(fmt.Sprintf("%s%s\n", itemPrefix, styledLabel))
+			if t.cursor == i && strings.TrimSpace(description) != "" {
+				activeHelp = description
+			}
+			continue
+		}
+
 		checked := ui.IconRadioOff              // Получаем иконку
 		var itemPrefix string                   // Получаем префикс
 		isDisabled := t.isDisabled(i)           // Проверяем, отключена ли задача

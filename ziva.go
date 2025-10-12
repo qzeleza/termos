@@ -52,6 +52,13 @@ type YesNoOption = task.YesNoOption
 // Item описывает элемент списка для задач выбора.
 type Item = task.Item
 
+var (
+	// SingleSelectDivider предоставляет стандартный разделитель для списков одиночного выбора.
+	SingleSelectDivider = task.SingleSelectDividerItem
+	// Divider — псевдоним для стандартного разделителя, чтобы использовать короткое имя.
+	Divider = SingleSelectDivider
+)
+
 // MultiSelectDependencyActions описывает действия, выполняемые при изменении состояния пунктов мультивыбора.
 type MultiSelectDependencyActions = task.MultiSelectDependencyActions
 
