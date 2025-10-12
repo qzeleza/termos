@@ -56,17 +56,11 @@ func (r *InputRenderer) RenderInput(title string, textInput textinput.Model, val
 		prefix += "  "
 	}
 
-	// Заголовок с учётом префикса, который уже содержит нужные пробелы
-	titleWithPrefix := fmt.Sprintf("%s%s", prefix, ui.ActiveTaskStyle.Render(title))
-
-	// Если передан таймер, выравниваем его справа
-	var titleView string
+	var timer string
 	if len(timerStr) > 0 && timerStr[0] != "" {
-		timer := ui.SubtleStyle.Render(timerStr[0])
-		titleView = ui.AlignTextToRight(titleWithPrefix, timer, width)
-	} else {
-		titleView = titleWithPrefix
+		timer = ui.SubtleStyle.Render(timerStr[0])
 	}
+	titleView := renderTitleWithWrap(prefix, title, ui.ActiveTaskStyle, timer, width)
 
 	// Получаем текст ввода с применением стиля
 	inputView := r.style.Render(textInput.View())
@@ -145,22 +139,15 @@ func (r *InputRenderer) RenderInput(title string, textInput textinput.Model, val
 // RenderFinal отображает финальное состояние задачи ввода
 func (r *InputRenderer) RenderFinal(title string, value string, hasError bool, err error, prefix string, width int) string {
 	var statusStyle lipgloss.Style
+	titleStyle := lipgloss.NewStyle()
 	var valueToShow string
 	commentLines := make([]string, 0, 2)
 	defaultIndent := ui.GetResultIndentWhenNumberingEnabled()
 
-	buildCommentLine := func(indent, text string) string {
-		return performance.FastConcat(
-			performance.RepeatEfficient(" ", ui.MainLeftIndent),
-			ui.VerticalLineSymbol,
-			indent,
-			text,
-		)
-	}
-
 	// Если есть ошибка
 	if hasError {
 		statusStyle = ui.GetErrorStatusStyle()
+		titleStyle = ui.GetErrorStatusStyle()
 		if err != nil {
 			valueToShow = err.Error()
 		} else {
@@ -178,8 +165,13 @@ func (r *InputRenderer) RenderFinal(title string, value string, hasError bool, e
 					cancelMessage = msg
 				}
 			}
-			cancelIndent := "   "
-			commentLines = append(commentLines, buildCommentLine(cancelIndent, ui.ErrorMessageStyle.Render(cancelMessage)))
+			cancelPrefix := performance.FastConcat(
+				performance.RepeatEfficient(" ", ui.MainLeftIndent),
+				ui.VerticalLineSymbol,
+				"   ",
+			)
+			lines := wrapTextWithPrefix(cancelPrefix, cancelMessage, width, ui.ErrorMessageStyle)
+			commentLines = append(commentLines, lines...)
 		}
 	} else {
 		statusStyle = ui.TaskStatusSuccessStyle
@@ -195,31 +187,25 @@ func (r *InputRenderer) RenderFinal(title string, value string, hasError bool, e
 	if strings.TrimSpace(prefix) == "" {
 		prefix = ui.GetCompletedInputTaskPrefix(!hasError)
 	}
-	leftPart := fmt.Sprintf("%s  %s", prefix, title)
+
 	rightPart := statusStyle.Render(valueToShow)
+	header := renderTitleWithWrap(prefix, title, titleStyle, rightPart, width)
 
 	if value != "" {
-		prefix := performance.FastConcat(
+		valuePrefix := performance.FastConcat(
 			performance.RepeatEfficient(" ", ui.MainLeftIndent),
 			ui.VerticalLineSymbol,
 			defaultIndent,
 		)
-		availableWidth := width - lipgloss.Width(prefix) - 2
-		if availableWidth < 1 {
-			availableWidth = 1
-		}
-		wrapped := ui.WrapText(value, availableWidth)
-		if len(wrapped) == 0 {
-			wrapped = []string{""}
-		}
-		for _, line := range wrapped {
-			commentLines = append(commentLines, prefix+ui.SubtleStyle.Render(line))
-		}
+		lines := wrapTextWithPrefix(valuePrefix, value, width, ui.SubtleStyle)
+		commentLines = append(commentLines, lines...)
 	}
 
 	var resultBuilder strings.Builder
-	resultBuilder.WriteString(ui.AlignTextToRight(leftPart, rightPart, width))
+	resultBuilder.WriteString(header)
 	if len(commentLines) > 0 {
+		resultBuilder.WriteString("\n")
+		resultBuilder.WriteString(strings.TrimSuffix(ui.DrawLine(width), "\n"))
 		resultBuilder.WriteString("\n")
 		for i, line := range commentLines {
 			if i > 0 {

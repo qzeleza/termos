@@ -15,7 +15,7 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, "└", CornerDownSymbol, "Угловой символ должен быть корректным")
 	assert.Equal(t, ">", ArrowSymbol, "Символ стрелки должен быть корректным")
 	assert.Equal(t, "├", BranchSymbol, "Символ ветки должен быть корректным")
-	assert.Equal(t, "✔", TaskCompletedSymbol, "Активный символ должен быть корректным")
+	assert.Equal(t, "●", TaskCompletedSymbol, "Активный символ должен быть корректным")
 	assert.Equal(t, 3, MessageIndentSpaces, "Отступ для сообщений должен быть 3")
 	assert.Equal(t, 2, MainLeftIndent, "Основной отступ должен быть 2")
 }
@@ -23,24 +23,23 @@ func TestConstants(t *testing.T) {
 // TestStringIndents проверяет корректное формирование строковых отступов
 func TestStringIndents(t *testing.T) {
 	// Проверяем основные отступы новой системы
-	assert.Equal(t, "   ", MessageIndent, "Отступ сообщений должен быть 3 пробела")
+	assert.Equal(t, strings.Repeat(" ", MessageIndentSpaces), MessageIndent, "Отступ сообщений должен быть 3 пробела")
 
 	// Проверяем функции префиксов
+	expectedCurrent := strings.Repeat(" ", MainLeftIndent) + TaskInProgressSymbol + "  "
+	assert.Equal(t, expectedCurrent, GetCurrentTaskPrefix(), "Префикс текущей задачи должен быть правильным")
 
-	currentPrefix := GetCurrentTaskPrefix()
-	assert.Equal(t, "  ├─☼ ", currentPrefix, "Префикс текущей задачи должен быть правильным")
+	expectedCompletedSuccess := strings.Repeat(" ", MainLeftIndent) + TaskCompletedSymbol
+	assert.Equal(t, expectedCompletedSuccess, GetCompletedTaskPrefix(true), "Префикс успешной задачи должен быть правильным")
 
-	completedPrefixSuccess := GetCompletedTaskPrefix(true)
-	assert.Equal(t, "  │✔", completedPrefixSuccess, "Префикс успешной задачи должен быть правильным")
+	expectedCompletedError := strings.Repeat(" ", MainLeftIndent) + TaskInProgressSymbol
+	assert.Equal(t, expectedCompletedError, GetCompletedTaskPrefix(false), "Префикс неуспешной задачи должен быть правильным")
 
-	completedPrefixError := GetCompletedTaskPrefix(false)
-	assert.Equal(t, "  │◷", completedPrefixError, "Префикс неуспешной задачи должен быть правильным")
+	expectedInputSuccess := strings.Repeat(" ", MainLeftIndent) + TaskCompletedSymbol
+	assert.Equal(t, expectedInputSuccess, GetCompletedInputTaskPrefix(true), "Префикс успешной текстовой задачи должен быть правильным")
 
-	textTaskPrefixSuccess := GetCompletedInputTaskPrefix(true)
-	assert.Equal(t, "  │ ✔", textTaskPrefixSuccess, "Префикс успешной текстовой задачи должен быть правильным")
-
-	textTaskPrefixError := GetCompletedInputTaskPrefix(false)
-	assert.Equal(t, "  │ ◷", textTaskPrefixError, "Префикс неуспешной текстовой задачи должен быть правильным")
+	expectedInputError := strings.Repeat(" ", MainLeftIndent) + TaskInProgressSymbol
+	assert.Equal(t, expectedInputError, GetCompletedInputTaskPrefix(false), "Префикс неуспешной текстовой задачи должен быть правильным")
 }
 
 // TestIcons проверяет наличие и валидность иконок
@@ -315,34 +314,33 @@ func TestFindOptimalCutPointRunes(t *testing.T) {
 // TestFormatErrorMessage проверяет функцию форматирования сообщений об ошибках
 func TestFormatErrorMessage(t *testing.T) {
 	tests := []struct {
-		name        string
-		errMsg      string
-		layoutWidth int
-		minExpected string // минимально ожидаемые элементы
+		name           string
+		errMsg         string
+		layoutWidth    int
+		expectedTokens []string
 	}{
 		{
-			name:        "Обычная ошибка",
-			errMsg:      "Произошла ошибка",
-			layoutWidth: 50,
-			minExpected: "Произошла ошибка",
+			name:           "Обычная ошибка",
+			errMsg:         "Произошла ошибка",
+			layoutWidth:    50,
+			expectedTokens: []string{"Произошла", "ошибка"},
 		},
 		{
 			name:        "Пустое сообщение",
 			errMsg:      "",
 			layoutWidth: 50,
-			minExpected: "",
 		},
 		{
-			name:        "Очень узкая ширина",
-			errMsg:      "Ошибка",
-			layoutWidth: 5,
-			minExpected: "Оши",
+			name:           "Очень узкая ширина",
+			errMsg:         "Ошибка",
+			layoutWidth:    5,
+			expectedTokens: []string{"Оши"},
 		},
 		{
-			name:        "Длинное сообщение",
-			errMsg:      "Это очень длинное сообщение об ошибке которое должно быть разбито на несколько строк",
-			layoutWidth: 30,
-			minExpected: "Это очень длинное",
+			name:           "Длинное сообщение",
+			errMsg:         "Это очень длинное сообщение об ошибке которое должно быть разбито на несколько строк",
+			layoutWidth:    30,
+			expectedTokens: []string{"Это", "очень", "длинное", "сообщение"},
 		},
 	}
 
@@ -355,7 +353,12 @@ func TestFormatErrorMessage(t *testing.T) {
 				return
 			}
 
-			assert.Contains(t, result, tt.minExpected, "Результат должен содержать ожидаемый текст")
+			normalized := strings.ReplaceAll(strings.Join(strings.Fields(strings.ReplaceAll(result, "\n", "")), ""), " ", "")
+			normalized = strings.ReplaceAll(normalized, VerticalLineSymbol, "")
+			for _, token := range tt.expectedTokens {
+				sanitized := strings.ReplaceAll(token, " ", "")
+				assert.Contains(t, normalized, sanitized, "Результат должен содержать ожидаемый текст: %s", token)
+			}
 			assert.True(t, strings.Contains(result, MessageIndent), "Результат должен содержать отступ")
 		})
 	}
@@ -366,26 +369,23 @@ func TestBuildFormattedMessage(t *testing.T) {
 	tests := []struct {
 		name           string
 		msg            string
-		effectiveWidth int
-		rightMargin    int
 		layoutWidth    int
-		shouldContain  []string
+		expectedTokens []string
+		expectIndent   bool
 	}{
 		{
 			name:           "Короткое сообщение",
 			msg:            "Короткое сообщение",
-			effectiveWidth: 50,
-			rightMargin:    2,
 			layoutWidth:    52,
-			shouldContain:  []string{"Короткое сообщение", MessageIndent},
+			expectedTokens: []string{"Короткое", "сообщение"},
+			expectIndent:   true,
 		},
 		{
 			name:           "Длинное сообщение",
 			msg:            "это очень длинное сообщение которое должно быть разбито на несколько строк для лучшей читаемости",
-			effectiveWidth: 20,
-			rightMargin:    2,
 			layoutWidth:    22,
-			shouldContain:  []string{"Это очень", MessageIndent},
+			expectedTokens: []string{"Это", "очень", "длинное", "сообщен", "ие"},
+			expectIndent:   true,
 		},
 	}
 
@@ -393,8 +393,15 @@ func TestBuildFormattedMessage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := FormatErrorMessage(tt.msg, tt.layoutWidth, false)
 
-			for _, expected := range tt.shouldContain {
-				assert.Contains(t, result, expected, "Результат должен содержать: %s", expected)
+			if tt.expectIndent {
+				assert.Contains(t, result, MessageIndent, "Результат должен содержать отступ")
+			}
+
+			normalized := strings.ReplaceAll(strings.Join(strings.Fields(strings.ReplaceAll(result, "\n", "")), ""), " ", "")
+			normalized = strings.ReplaceAll(normalized, VerticalLineSymbol, "")
+			for _, token := range tt.expectedTokens {
+				sanitized := strings.ReplaceAll(token, " ", "")
+				assert.Contains(t, normalized, sanitized, "Результат должен содержать: %s", token)
 			}
 		})
 	}

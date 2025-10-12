@@ -1,6 +1,7 @@
 package task_test
 
 import (
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -58,7 +59,8 @@ func TestYesNoTaskInQueueStatistics(t *testing.T) {
 
 	// Проверяем, что в статистике правильно подсчитываются ошибки
 	// Должно быть: 1 успешных из 3 всего и статус ПРОБЛЕМА
-	assert.Contains(t, view, "Успешно завершено 1 из 3 задач", "Статистика должна показывать 1 успешных из 3 всего")
+	expectedSummary := fmt.Sprintf("%s (2/3)", defaults.SummaryCompleted)
+	assert.Contains(t, view, expectedSummary, "Статистика должна показывать 2 успешных из 3 всего")
 	assert.Contains(t, view, defaults.StatusProblem, "Статус должен показывать проблему из-за task2")
 }
 
@@ -91,7 +93,8 @@ func TestYesNoTaskInQueueAllSuccess(t *testing.T) {
 	view := model.View()
 
 	// Проверяем успешную статистику
-	assert.Contains(t, view, "Успешно завершено 1 из 2 задач", "Статистика должна показывать успешных из всего")
+	expectedSummary := fmt.Sprintf("%s (2/2)", defaults.SummaryCompleted)
+	assert.Contains(t, view, expectedSummary, "Статистика должна показывать 2 успешных из 2 всего")
 }
 
 // TestYesNoTaskInQueueAllNo проверяет очередь, где все YesNoTask выбирают "Нет"
@@ -125,6 +128,7 @@ func TestYesNoTaskInQueueAllNo(t *testing.T) {
 	view := model.View()
 
 	// Проверяем статистику с ошибками
-	assert.Contains(t, view, "Успешно завершено 0 из 2 задач", "Статистика должна показывать 0 успешных из 2 всего")
+	expectedSummary := fmt.Sprintf("%s (0/2)", defaults.SummaryCompleted)
+	assert.Contains(t, view, expectedSummary, "Статистика должна показывать 0 успешных из 2 всего")
 	assert.Contains(t, view, defaults.StatusProblem, "Статус должен показывать проблему")
 }

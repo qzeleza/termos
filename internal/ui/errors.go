@@ -4,6 +4,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/qzeleza/ziva/internal/common"
 	"github.com/qzeleza/ziva/internal/performance"
 )
 
@@ -26,8 +27,8 @@ func FormatErrorMessage(errMsg string, layoutWidth int, preserveNewLines bool) s
 	// Длина префикса
 	const prefixLen = 2 + 1 + 3
 
-	// Эффективная ширина области текста (с учётом отступов и правого поля)
-	wrapWidth := layoutWidth - rightMargin - prefixLen
+	// Эффективная ширина области текста (с учётом отступов, правого поля и резервного зазора)
+	wrapWidth := layoutWidth - rightMargin - prefixLen - common.LayoutWrapMargin
 	if wrapWidth < 3 {
 		// Минимальная ширина, чтобы тесты для узкого лэйаута получали хотя бы 3 символа (например, "Оши")
 		wrapWidth = 3

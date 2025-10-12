@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/qzeleza/ziva/internal/defaults"
 	"github.com/qzeleza/ziva/internal/ui"
 )
@@ -170,16 +171,10 @@ func (t *YesNoTask) FinalView(width int) string {
 		prefix = ui.GetCompletedTaskPrefix(success)
 	}
 
-	// Определяем стиль заголовка в зависимости от результата
-	var styledTitle string
-	if success {
-		styledTitle = t.title
-	} else {
-		styledTitle = ui.GetErrorStatusStyle().Render(t.title)
+	titleStyle := lipgloss.NewStyle()
+	if !success {
+		titleStyle = ui.GetErrorStatusStyle()
 	}
-
-	// Сформируем левую часть строки
-	left := fmt.Sprintf("%s  %s", prefix, styledTitle)
 
 	// Сформируем правую часть строки
 	var right string
@@ -195,15 +190,17 @@ func (t *YesNoTask) FinalView(width int) string {
 		}
 	}
 
-	// Сформируем отрисовки линии результата
-	result := "\n"
+	header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
+
+	var builder strings.Builder
+	builder.WriteString(header)
+	builder.WriteString("\n")
 	// Если задача завершилась успешно и есть дополнительные строки для вывода
-	if t.showResultLine && t.icon == ui.IconDone { // && len(t.items) > 0 && t.cursor >= 0 && t.cursor < len(t.items) {
-		result = "\n" + ui.DrawSummaryLine(t.items[t.cursor].displayName())
+	if t.showResultLine && t.icon == ui.IconDone && t.cursor >= 0 && t.cursor < len(t.items) {
+		builder.WriteString(ui.DrawSummaryLine(t.items[t.cursor].displayName(), width))
 	}
 
-	// Выравниваем по ширине макета
-	return ui.AlignTextToRight(left, right, width) + result
+	return builder.String()
 }
 
 // WithResultLine управляет отображением итоговой строки результата (совместимость)

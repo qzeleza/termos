@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -82,6 +83,20 @@ func TestFormatErrorMessageWithPreserveNewLines(t *testing.T) {
 			// Проверяем наличие отступов
 			assert.True(t, strings.Contains(result, MessageIndent), "Результат должен содержать отступ")
 		})
+	}
+}
+
+func TestFormatErrorMessageRespectsLayoutWidth(t *testing.T) {
+	errMsg := "Очень длинное сообщение об ошибке, которое должно автоматически переноситься по ширине макета без сохранения исходных переносов строк."
+	layoutWidth := 40
+
+	result := FormatErrorMessage(errMsg, layoutWidth, false)
+	lines := strings.Split(result, "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		assert.LessOrEqual(t, lipgloss.Width(line), layoutWidth, "Каждая строка не должна превышать ширину макета")
 	}
 }
 

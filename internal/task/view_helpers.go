@@ -11,31 +11,40 @@ import (
 )
 
 // renderSelectionSeparator формирует разделитель между заголовком и списком пунктов
+// @param width Ширина макета для отображения
+// @param enabled Флаг, указывающий, нужно ли отображать разделительную линию
+// @param inProgressPrefix Префикс активной задачи
+// @return Строка с отформатированным разделителем
 func renderSelectionSeparator(width int, enabled bool, inProgressPrefix string) string {
 	if !enabled {
 		return ""
 	}
+	// Если префикс активной задачи не указан, используем текущий префикс
 	if strings.TrimSpace(inProgressPrefix) == "" {
 		inProgressPrefix = ui.GetCurrentTaskPrefix()
 	}
 
+	// Формируем базовый префикс
 	basePrefix := performance.FastConcat(
 		performance.RepeatEfficient(" ", ui.MainLeftIndent),
 		ui.VerticalLineSymbol,
 		"  ",
 	)
 
+	// Вычисляем ширину префикса активной задачи и базового префикса
 	targetWidth := lipgloss.Width(inProgressPrefix)
 	baseWidth := lipgloss.Width(basePrefix)
 	if targetWidth < baseWidth {
 		targetWidth = baseWidth
 	}
 
+	// Вычисляем количество дополнительных пробелов
 	extraSpaces := targetWidth - baseWidth
 	if extraSpaces < 0 {
 		extraSpaces = 0
 	}
 
+	// Формируем префикс
 	prefix := performance.FastConcat(
 		basePrefix,
 		performance.RepeatEfficient(" ", extraSpaces),
@@ -62,6 +71,9 @@ func renderSelectionSeparator(width int, enabled bool, inProgressPrefix string) 
 }
 
 // formatNavigationHelpText подготавливает строку подсказки по навигации с учётом ширины макета.
+// @param helpText Строка подсказки по навигации
+// @param width Ширина макета для отображения
+// @return Строка с отформатированной подсказкой
 func formatNavigationHelpText(helpText string, width int) string {
 	if strings.TrimSpace(helpText) == "" {
 		return helpText

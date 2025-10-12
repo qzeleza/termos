@@ -793,14 +793,17 @@ func (t *MultiSelectTask) WithDefaultItems(defauiltSelection interface{}) *Multi
 	}
 
 	if anyApplied {
-		// Перемещаем курсор на первый выбранный элемент (если он вне диапазона)
-		if t.cursor < 0 || t.cursor >= len(t.items) {
-			for i := range t.items {
-				if t.isSelected(i) {
-					t.cursor = i
-					break
-				}
+		// Перемещаем курсор на первый выбранный элемент
+		cursorSet := false
+		for i := range t.items {
+			if t.isSelected(i) {
+				t.cursor = i
+				cursorSet = true
+				break
 			}
+		}
+		if !cursorSet && t.hasSelectAll {
+			t.cursor = -1
 		}
 	}
 
@@ -1147,21 +1150,14 @@ func (t *MultiSelectTask) View(width int) string {
 	// Заголовок задачи с префиксом активной задачи (поддерживает кастомные префиксы)
 	titlePrefix := t.InProgressPrefix()
 
-	// Формируем заголовок с префиксом
-	title := ui.ActiveTaskStyle.Render(t.title)
-	titleWithPrefix := fmt.Sprintf("%s%s", titlePrefix, title)
-
 	// Получаем отформатированный таймер (если он активен)
 	timerStr := t.RenderTimer()
 
-	// Если есть таймер, выравниваем заголовок и таймер по правому краю
-	if timerStr != "" {
-		titleLine := ui.AlignTextToRight(titleWithPrefix, timerStr, width)
-		sb.WriteString(titleLine + "\n")
-	} else {
-		sb.WriteString(titleWithPrefix + "\n")
-	}
+	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTaskStyle, timerStr, width)
+	sb.WriteString(header)
+	sb.WriteString("\n")
 
+	// Добавляем разделительную линию
 	sb.WriteString(renderSelectionSeparator(width, t.showSelectionSeparator, titlePrefix))
 
 	// Получаем диапазон видимых элементов с учетом viewport
@@ -1368,7 +1364,7 @@ func (t *MultiSelectTask) FinalView(width int) string {
 		if len(names) > 0 {
 			result += "\n"
 			for _, value := range names {
-				result += ui.DrawSummaryLine(value)
+				result += ui.DrawSummaryLine(value, width)
 			}
 		}
 	}

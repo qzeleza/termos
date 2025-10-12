@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/qzeleza/ziva/internal/defaults"
+	terrors "github.com/qzeleza/ziva/internal/errors"
 	"github.com/qzeleza/ziva/internal/performance"
 	"github.com/qzeleza/ziva/internal/ui"
 )
@@ -106,6 +107,17 @@ func (t *SingleSelectTask) handleExitShortcut() (Task, tea.Cmd) {
 		t.finalValue = defaults.DefaultSuccessLabel
 	}
 	t.SetError(nil)
+	return t, nil
+}
+
+func (t *SingleSelectTask) handleCancel() (Task, tea.Cmd) {
+	cancelErr := terrors.NewCancelError(t.title)
+	t.SetError(cancelErr)
+	t.stopTimeout()
+	t.done = true
+	t.icon = ui.IconCancelled
+	t.cursor = -1
+	t.finalValue = ui.ErrorMessageStyle.Render(defaults.CancelShort)
 	return t, nil
 }
 
@@ -467,7 +479,9 @@ func (t *SingleSelectTask) Update(msg tea.Msg) (Task, tea.Cmd) {
 				t.updateViewport()
 			}
 			return t, nil
-		case "q", "Q", "esc", "Esc", "ctrl+c", "Ctrl+C", "left", "Left":
+		case "q", "Q":
+			return t.handleCancel()
+		case "esc", "Esc", "ctrl+c", "Ctrl+C", "left", "Left":
 			return t.handleExitShortcut()
 		case "enter", "right", "Right":
 			// Если таймер активен, останавливаем его
@@ -544,21 +558,15 @@ func (t *SingleSelectTask) View(width int) string {
 	// Добавляем заголовок задачи с префиксом для активной задачи (учитываем нумерацию)
 	titlePrefix := t.InProgressPrefix()
 
-	// Формируем заголовок с префиксом
-	title := ui.ActiveTitleStyle.Render(t.title)
-	titleWithPrefix := fmt.Sprintf("%s%s", titlePrefix, title)
-
 	// Получаем отформатированный таймер (если он активен)
 	timerStr := t.RenderTimer()
 
-	// Если есть таймер, выравниваем заголовок и таймер по правому краю
-	if timerStr != "" {
-		titleLine := ui.AlignTextToRight(titleWithPrefix, timerStr, width)
-		sb.WriteString(titleLine + "\n")
-	} else {
-		sb.WriteString(titleWithPrefix + "\n")
-	}
+	// Формируем заголовок задачи
+	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTitleStyle, timerStr, width)
+	sb.WriteString(header)
+	sb.WriteString("\n")
 
+	// Добавляем разделительную линию
 	sb.WriteString(renderSelectionSeparator(width, t.showSelectionSeparator, titlePrefix))
 
 	// Получаем диапазон видимых элементов с учетом viewport
@@ -594,13 +602,13 @@ func (t *SingleSelectTask) View(width int) string {
 			var itemPrefix string
 			switch {
 			case t.cursor == i:
-				itemPrefix = ui.GetSelectItemPrefix("active")
+				itemPrefix = ui.GetSelectItemPrefix("active") // Префикс для активного элемента
 			case i < t.cursor:
-				itemPrefix = ui.GetSelectItemPrefix("above")
+				itemPrefix = ui.GetSelectItemPrefix("above") // Префикс для элементов выше курсора
 			default:
-				itemPrefix = ui.GetSelectItemPrefix("below")
+				itemPrefix = ui.GetSelectItemPrefix("below") // Префикс для элементов ниже курсора
 			}
-			styledLabel := ui.DisabledStyle.Render(label)
+			styledLabel := ui.DisabledStyle.Render(label) // Отображаемый текст с стилем
 			sb.WriteString(fmt.Sprintf("%s%s\n", itemPrefix, styledLabel))
 			if t.cursor == i && strings.TrimSpace(description) != "" {
 				activeHelp = description
@@ -700,7 +708,7 @@ func (t *SingleSelectTask) FinalView(width int) string {
 
 	// Если задача завершилась успешно и есть дополнительные строки для вывода
 	if t.icon == ui.IconDone && len(t.items) > 0 && t.cursor >= 0 && t.cursor < len(t.items) {
-		result += "\n" + ui.DrawSummaryLine(t.items[t.cursor].displayName())
+		result += "\n" + ui.DrawSummaryLine(t.items[t.cursor].displayName(), width)
 	}
 
 	return result

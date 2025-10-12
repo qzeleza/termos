@@ -8,8 +8,10 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/qzeleza/ziva/internal/common"
 	"github.com/qzeleza/ziva/internal/defaults"
+	"github.com/qzeleza/ziva/internal/performance"
 	"github.com/qzeleza/ziva/internal/ui"
 )
 
@@ -200,39 +202,31 @@ func (t *BaseTask) FinalView(width int) string {
 
 	// Для простых значений Yes/No используем отдельные стили для "Да" и "Нет"
 	if t.finalValue == defaults.DefaultYes || t.finalValue == defaults.DefaultNo {
-		// Определяем стиль заголовка в зависимости от результата
-		var styledTitle string
-		if t.finalValue == defaults.DefaultYes {
-			styledTitle = t.title
-		} else {
-			styledTitle = ui.GetErrorStatusStyle().Render(t.title)
+		titleStyle := lipgloss.NewStyle()
+		if t.finalValue == defaults.DefaultNo {
+			titleStyle = ui.GetErrorStatusStyle()
 		}
 
-		left := fmt.Sprintf("%s %s", prefix, styledTitle)
 		var right string
 		if t.finalValue == defaults.DefaultYes {
 			right = ui.TaskStatusSuccessStyle.Render(t.finalValue)
 		} else {
 			right = ui.GetErrorStatusStyle().Render(t.finalValue)
 		}
-		return ui.AlignTextToRight(left, right, width)
+		return renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
 	}
 
 	// Для ошибок выводим текст ошибки с отступом и слово "Ошибка" справа
 	if t.icon == ui.IconError {
-		// Создаем левую часть с заголовком и префиксом (prefix уже содержит ✕)
-		// Заголовок окрашиваем в цвет ошибки
-		styledTitle := ui.GetErrorStatusStyle().Render(t.title)
-		left := fmt.Sprintf("%s  %s", prefix, styledTitle)
-
-		// Создаем правую часть со словом "Ошибка"
+		titleStyle := ui.GetErrorStatusStyle()
 		right := ui.GetErrorStatusStyle().Render(defaults.TaskStatusError)
+		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
 
-		// Создаем верхнюю строку с выравниванием
-		result := ui.AlignTextToRight(left, right, width) + "\n"
+		var result strings.Builder
+		result.WriteString(header)
+		result.WriteString("\n")
 
 		// Форматируем текст ошибки с отступом и переносами строк
-		// Используем ширину на 4 символа меньше для отступа
 		errText := ""
 		// Получаем текст ошибки из finalValue, так как это уже отрендеренный текст
 		if t.finalValue != "" {
@@ -244,22 +238,19 @@ func (t *BaseTask) FinalView(width int) string {
 		// Добавляем отформатированный текст ошибки
 		// Используем параметр preserveErrorNewLines для управления форматированием
 		errorMsg := ui.FormatErrorMessage(errText, common.CalculateLayoutWidth(width), t.preserveErrorNewLines)
-		result += errorMsg
+		result.WriteString(errorMsg)
 
-		return result
+		return result.String()
 	}
 
 	// Для обычных задач используем стандартное форматирование с новым префиксом
 	if t.finalValue != "" && !strings.Contains(t.finalValue, t.title) {
-		// Определяем стиль заголовка в зависимости от успешности
-		var styledTitle string
-		if success {
-			styledTitle = t.title
-		} else {
-			styledTitle = ui.GetErrorStatusStyle().Render(t.title)
+		titleStyle := lipgloss.NewStyle()
+		if !success {
+			titleStyle = ui.GetErrorStatusStyle()
 		}
 
-		left := fmt.Sprintf("%s  %s", prefix, styledTitle)
+		// Формируем статус
 		statusLabel := strings.ToUpper(defaults.DefaultSuccessLabel)
 		statusStyle := ui.TaskStatusSuccessStyle
 		if t.icon == ui.IconCancelled {
@@ -270,18 +261,39 @@ func (t *BaseTask) FinalView(width int) string {
 			statusStyle = ui.GetErrorStatusStyle()
 		}
 
+		// Формируем правую часть заголовка
 		right := statusStyle.Render(statusLabel)
-		result := ui.AlignTextToRight(left, right, width)
+		// Формируем заголовок
+		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
 
+		// Формируем основной текст
+		var result strings.Builder
+		result.WriteString(header)
+		// Добавляем основной текст
 		if t.icon == ui.IconCancelled {
+			// Убираем стилизацию из текста ошибки
 			trimmedValue := strings.TrimSpace(t.finalValue)
 			if trimmedValue != "" {
-				valueLine := strings.Repeat(" ", ui.MainLeftIndent) + ui.VerticalLineSymbol + ui.GetResultIndentWhenNumberingEnabled() + trimmedValue
-				result = result + "\n" + valueLine + "\n"
+				result.WriteString("\n")
+				// Формируем префикс для основного текста
+				valuePrefix := performance.FastConcat(
+					performance.RepeatEfficient(" ", ui.MainLeftIndent),
+					ui.VerticalLineSymbol,
+					ui.GetResultIndentWhenNumberingEnabled(),
+				)
+				// Переносим текст ошибки
+				wrapped := wrapTextWithPrefix(valuePrefix, trimmedValue, width, lipgloss.NewStyle())
+				for i, line := range wrapped {
+					if i > 0 {
+						result.WriteString("\n")
+					}
+					result.WriteString(line)
+				}
+				result.WriteString("\n")
 			}
 		}
 
-		return result
+		return result.String()
 	}
 
 	// Если finalValue уже содержит полное форматирование, возвращаем как есть
@@ -290,14 +302,191 @@ func (t *BaseTask) FinalView(width int) string {
 	}
 
 	// Запасной вариант - просто отображаем заголовок с префиксом
-	// Определяем стиль заголовка в зависимости от успешности
-	var styledTitle string
-	if success {
-		styledTitle = t.title
-	} else {
-		styledTitle = ui.GetErrorStatusStyle().Render(t.title)
+	titleStyle := lipgloss.NewStyle()
+	if !success {
+		titleStyle = ui.GetErrorStatusStyle()
 	}
-	return fmt.Sprintf("%s  %s", prefix, styledTitle)
+	return renderTitleWithWrap(prefix, t.title, titleStyle, "", width)
+}
+
+// renderTitleWithWrap отображает заголовок с префиксом и правым текстом
+// @param prefix - префикс заголовка
+// @param title - заголовок
+// @param titleStyle - стиль заголовка
+// @param right - правый текст
+// @param width - ширина
+// @return string - отформатированный заголовок
+func renderTitleWithWrap(prefix, title string, titleStyle lipgloss.Style, right string, width int) string {
+	titlePrefix := ensurePrefixSpacing(prefix)                      // добавляет отступы к префиксу
+	continuationPrefix := buildContinuationTitlePrefix(titlePrefix) // создает префикс для продолжения заголовка
+
+	// вычисляет эффективную ширину
+	effectiveWidth := width - common.LayoutWrapMargin
+	if effectiveWidth < 1 {
+		effectiveWidth = 1
+	}
+
+	// вычисляет ширину префикса
+	prefixWidth := lipgloss.Width(titlePrefix)
+	if prefixWidth >= effectiveWidth {
+		prefixWidth = effectiveWidth - 1
+	}
+
+	// вычисляет ширину правого текста
+	rightWidth := lipgloss.Width(right)
+	const minGap = 2
+
+	// вычисляет ширину первой строки
+	firstWidth := effectiveWidth - prefixWidth
+	if right != "" {
+		firstWidth = effectiveWidth - prefixWidth - rightWidth - minGap
+	}
+	if firstWidth < 1 {
+		firstWidth = 1
+	}
+
+	// вычисляет ширину остальных строк
+	otherWidth := effectiveWidth - prefixWidth
+	if otherWidth < 1 {
+		otherWidth = 1
+	}
+
+	// оборачивает заголовок в несколько строк
+	wrapped := wrapTitleText(title, firstWidth, otherWidth)
+	if len(wrapped) == 0 {
+		wrapped = []string{""}
+	}
+
+	// формирует заголовок
+	firstLeft := titlePrefix + titleStyle.Render(wrapped[0])
+	header := ui.AlignTextToRight(firstLeft, right, width) // выравнивает заголовок по правому краю
+
+	if len(wrapped) == 1 {
+		return header
+	}
+
+	// формирует заголовок
+	var builder strings.Builder
+	builder.WriteString(header)
+	// добавляет остальные строки
+	for i := 1; i < len(wrapped); i++ {
+		builder.WriteString("\n")
+		builder.WriteString(continuationPrefix)
+		builder.WriteString(titleStyle.Render(wrapped[i]))
+	}
+
+	return builder.String()
+}
+
+// ensurePrefixSpacing добавляет отступы к префиксу
+// @param prefix - префикс
+// @return string - префикс с отступами
+func ensurePrefixSpacing(prefix string) string {
+	switch {
+	case strings.HasSuffix(prefix, "  "):
+		return prefix
+	case strings.HasSuffix(prefix, " "):
+		return prefix + " "
+	default:
+		return prefix + "  "
+	}
+}
+
+func wrapTitleText(text string, firstWidth, otherWidth int) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []string{""}
+	}
+
+	runes := []rune(text)
+	var lines []string
+	start := 0
+	currentWidth := firstWidth
+
+	for start < len(runes) {
+		if currentWidth < 1 {
+			currentWidth = 1
+		}
+
+		if start+currentWidth >= len(runes) {
+			line := strings.TrimSpace(string(runes[start:]))
+			if line == "" {
+				line = string(runes[start:])
+			}
+			lines = append(lines, line)
+			break
+		}
+
+		cut := start + currentWidth
+		for cut > start && runes[cut-1] != ' ' {
+			cut--
+		}
+		if cut == start {
+			cut = start + currentWidth
+		}
+
+		line := strings.TrimSpace(string(runes[start:cut]))
+		if line == "" {
+			line = string(runes[start:cut])
+		}
+		lines = append(lines, line)
+
+		start = cut
+		for start < len(runes) && runes[start] == ' ' {
+			start++
+		}
+
+		currentWidth = otherWidth
+	}
+
+	if len(lines) == 0 {
+		lines = append(lines, "")
+	}
+
+	return lines
+}
+
+func wrapTextWithPrefix(prefix, text string, width int, style lipgloss.Style) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+
+	contentWidth := width - lipgloss.Width(prefix) - common.LayoutWrapMargin
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+
+	lines := ui.WrapText(text, contentWidth)
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	result := make([]string, len(lines))
+	for i, line := range lines {
+		result[i] = prefix + style.Render(line)
+	}
+	return result
+}
+
+func buildContinuationTitlePrefix(firstPrefix string) string {
+	width := lipgloss.Width(firstPrefix)
+	if width <= 0 {
+		width = lipgloss.Width(ensurePrefixSpacing(""))
+	}
+
+	verticalWidth := lipgloss.Width(ui.VerticalLineSymbol)
+	suffixWidth := lipgloss.Width("  ")
+	spacesCount := width - verticalWidth - suffixWidth
+	if spacesCount < 0 {
+		spacesCount = 0
+	}
+
+	return performance.FastConcat(
+		performance.RepeatEfficient(" ", spacesCount),
+		ui.VerticalLineSymbol,
+		performance.RepeatEfficient(" ", suffixWidth),
+	)
 }
 
 // SetCompletedPrefix позволяет переопределить префикс завершённой задачи (используется очередью)

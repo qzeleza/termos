@@ -47,6 +47,7 @@ func TestIsLimitedTerminal_EnvHeuristics(t *testing.T) {
 	t.Setenv("TERM", "dumb")
 	t.Setenv("NO_COLOR", "1")
 	t.Setenv("LANG", "C")
+	t.Setenv("COLORTERM", "")
 	if !isLimitedTerminal() {
 		t.Fatal("expected limited terminal for TERM=dumb NO_COLOR=1 LANG=C")
 	}
@@ -54,6 +55,7 @@ func TestIsLimitedTerminal_EnvHeuristics(t *testing.T) {
 	t.Setenv("TERM", "xterm-256color")
 	t.Setenv("NO_COLOR", "")
 	t.Setenv("LANG", "en_US.UTF-8")
+	t.Setenv("COLORTERM", "truecolor")
 	if isLimitedTerminal() {
 		t.Fatal("did not expect limited terminal for xterm-256color and UTF-8")
 	}

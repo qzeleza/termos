@@ -9,6 +9,8 @@ const (
 	DefaultWidth = 80
 	// MinRatio - минимальное соотношение ширины макета к ширине экрана
 	MinRatio = 4.0 / 7.0
+	// LayoutWrapMargin — запас символов, вычитаемый при форматировании длинных строк
+	LayoutWrapMargin = 12
 )
 
 // CalculateLayoutWidth вычисляет оптимальную ширину макета на основе ширины экрана.

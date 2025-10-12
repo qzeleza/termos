@@ -4,6 +4,7 @@ package task
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/qzeleza/ziva/internal/ui"
@@ -73,5 +74,5 @@ func TestBaseTaskFinalView(t *testing.T) {
 	errorFinalView := errorTask.FinalView(80)
 	assert.Contains(t, errorFinalView, title, "FinalView должен содержать заголовок задачи")
 	assert.Contains(t, errorFinalView, "ОШИБКА", "FinalView должен содержать слово 'ОШИБКА'")
-	assert.Contains(t, errorFinalView, "Тестовая ошибка", "FinalView должен содержать текст ошибки")
+	assert.Contains(t, strings.ToLower(errorFinalView), strings.ToLower(expectedError.Error()), "FinalView должен содержать текст ошибки")
 }

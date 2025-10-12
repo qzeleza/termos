@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/qzeleza/ziva/internal/common"
 	"github.com/qzeleza/ziva/internal/performance"
 )
 
@@ -378,10 +379,33 @@ func GetResultIndentWhenNumberingEnabled() string {
 }
 
 // DrawSummaryLine рисует дополнительные строки с отступом
-func DrawSummaryLine(text string) string {
-	styledLine := SubtleStyle.Render(text)
-	indent := performance.RepeatEfficient(" ", MainLeftIndent)
-	return indent + VerticalLineSymbol + GetResultIndentWhenNumberingEnabled() + styledLine + "\n"
+func DrawSummaryLine(text string, width int) string {
+	prefix := performance.FastConcat(
+		performance.RepeatEfficient(" ", MainLeftIndent),
+		VerticalLineSymbol,
+		GetResultIndentWhenNumberingEnabled(),
+	)
+
+	contentWidth := width - lipgloss.Width(prefix) - common.LayoutWrapMargin
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+
+	lines := WrapText(text, contentWidth)
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	var builder strings.Builder
+	for i, line := range lines {
+		if i > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString(prefix)
+		builder.WriteString(SubtleStyle.Render(line))
+	}
+	builder.WriteString("\n")
+	return builder.String()
 }
 
 // DrawLine создает горизонтальную линию заданной ширины

@@ -289,7 +289,7 @@ func (t *FuncTask) drawSummaryLines(width int) string {
 	// Добавляем каждую строку с настраиваемым отступом
 	for _, text_line := range t.summaryLines {
 		if strings.TrimSpace(text_line) != "" { // Пропускаем пустые строки
-			result += ui.DrawSummaryLine(text_line) // Добавляем дополнительные строки с отступом
+			result += ui.DrawSummaryLine(text_line, width) // Добавляем дополнительные строки с отступом
 		}
 	}
 

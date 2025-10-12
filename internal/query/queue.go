@@ -65,7 +65,6 @@ func init() {
 // @return uint64 - значение памяти в байтах
 func parseMemoryEnv(s string) (uint64, error) {
 	s = strings.TrimSpace(s)
-	s = strings.ReplaceAll(s, "_", "")
 	up := strings.ToUpper(s)
 	var mult uint64 = 1
 	num := s
@@ -92,11 +91,42 @@ func parseMemoryEnv(s string) (uint64, error) {
 		mult = 1
 		num = s[:len(s)-1]
 	}
-	n, err := strconv.ParseUint(strings.TrimSpace(num), 10, 64)
+	num = strings.TrimSpace(num)
+	cleanNum, err := normalizeMemoryNumber(num)
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseUint(cleanNum, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 	return n * mult, nil
+}
+
+func normalizeMemoryNumber(num string) (string, error) {
+	if !strings.Contains(num, "_") {
+		return num, nil
+	}
+
+	parts := strings.Split(num, "_")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("invalid numeric format")
+	}
+
+	for i, part := range parts {
+		if part == "" {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+		if i == 0 {
+			if len(part) == 0 || len(part) > 3 {
+				return "", fmt.Errorf("invalid numeric format")
+			}
+		} else if len(part) != 3 {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+	}
+
+	return strings.Join(parts, ""), nil
 }
 
 // Используем константы из пакета common для расчета ширины макета
@@ -242,18 +272,18 @@ func (m *Model) formatSummaryWithStats() (string, string) {
 	completedTasks := m.successCount + m.errorCount
 
 	// Формируем левую часть: summary + (успешных/всего)
+	summaryLabel := sanitizeSummaryText(m.summary)
+	if summaryLabel == "" {
+		summaryLabel = defaults.SummaryCompleted
+	}
+
 	leftSummary := performance.FastConcat(
-		m.summary,
-		" ",
-		performance.FastConcat(
-			performance.IntToString(m.successCount),
-			" ",
-			defaults.DefaultFromSummaryLabel,
-			" ",
-			performance.IntToString(totalTasks),
-		),
-		" ",
-		defaults.DefaultTasksSummaryLabel,
+		summaryLabel,
+		" (",
+		performance.IntToString(m.successCount),
+		"/",
+		performance.IntToString(totalTasks),
+		")",
 	)
 
 	// Формируем правую часть: УСПЕШНО или С ОШИБКАМИ
@@ -270,7 +300,275 @@ func (m *Model) formatSummaryWithStats() (string, string) {
 	return leftSummary, rightStatus
 }
 
-// Запускает очередь задач
+// renderSummaryFooter рендерит футер сводки
+// @param leftSummary Левая часть сводки
+// @param rightStatus Правая часть сводки
+// @param layoutWidth Ширина макета
+// @param summaryStyle Стиль для левой части
+// @param rightStyle Стиль для правой части
+// @return string
+func (m *Model) renderSummaryFooter(leftSummary, rightStatus string, layoutWidth int, summaryStyle, rightStyle lipgloss.Style) string {
+	cleanSummary := sanitizeSummaryText(leftSummary)
+	if cleanSummary == "" {
+		cleanSummary = defaults.SummaryCompleted
+	}
+
+	rightRendered := rightStyle.Render(rightStatus)
+	actionSymbol := ui.FinishedLabelStyle.Render(ui.TaskCompletedSymbol)
+	prefix := performance.FastConcat("  ", actionSymbol, "  ")
+	prefixWidth := lipgloss.Width(prefix)
+	continuationPrefix := performance.FastConcat(
+		"  ",
+		performance.RepeatEfficient(" ", lipgloss.Width(actionSymbol)),
+		"  ",
+	)
+
+	const minGap = 2
+	contentWidth := layoutWidth - common.LayoutWrapMargin
+	if contentWidth < 1 {
+		contentWidth = 1
+	}
+
+	rightWidth := lipgloss.Width(rightRendered)
+	availableFirstWidth := contentWidth - prefixWidth - rightWidth - minGap
+	if availableFirstWidth < 1 {
+		availableFirstWidth = contentWidth - prefixWidth
+	}
+	if availableFirstWidth < 1 {
+		availableFirstWidth = 1
+	}
+
+	subsequentWidth := contentWidth - prefixWidth
+	if subsequentWidth < 1 {
+		subsequentWidth = 1
+	}
+
+	lines := wrapSummaryText(cleanSummary, availableFirstWidth, subsequentWidth)
+	if len(lines) == 0 {
+		lines = []string{""}
+	}
+
+	var builder strings.Builder
+
+	firstLeft := performance.FastConcat(prefix, summaryStyle.Render(lines[0]))
+	builder.WriteString(ui.AlignTextToRight(firstLeft, rightRendered, layoutWidth))
+	builder.WriteString("\n")
+
+	for i := 1; i < len(lines); i++ {
+		builder.WriteString(continuationPrefix)
+		builder.WriteString(summaryStyle.Render(lines[i]))
+		builder.WriteString("\n")
+	}
+
+	builder.WriteString("\n")
+	builder.WriteString(ui.DrawLine(layoutWidth))
+	builder.WriteString("\n")
+
+	return builder.String()
+}
+
+// sanitizeSummaryText удаляет лишние пробелы и переносы строк
+// @param summary Сводка
+// @return string
+func sanitizeSummaryText(summary string) string {
+	if summary == "" {
+		return ""
+	}
+	normalized := strings.ReplaceAll(summary, "\n", " ")
+	fields := strings.Fields(normalized)
+	return strings.Join(fields, " ")
+}
+
+// wrapSummaryText обрезает текст сводки
+// @param text Текст сводки
+// @param firstWidth Ширина первой строки
+// @param otherWidth Ширина последующих строк
+// @return []string
+func wrapSummaryText(text string, firstWidth, otherWidth int) []string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return []string{}
+	}
+
+	if firstWidth < 1 {
+		firstWidth = 1
+	}
+	if otherWidth < 1 {
+		otherWidth = 1
+	}
+
+	runes := []rune(text)
+	length := len(runes)
+	var lines []string
+
+	start := 0
+	currentWidth := firstWidth
+
+	for start < length {
+		if currentWidth < 1 {
+			currentWidth = 1
+		}
+
+		if start+currentWidth >= length {
+			line := strings.TrimSpace(string(runes[start:]))
+			if line == "" {
+				line = string(runes[start:])
+			}
+			lines = append(lines, line)
+			break
+		}
+
+		cut := summaryCutPoint(runes, start, currentWidth)
+		if cut <= 0 {
+			cut = currentWidth
+		}
+
+		line := strings.TrimSpace(string(runes[start : start+cut]))
+		if line == "" {
+			line = string(runes[start : start+cut])
+		}
+		lines = append(lines, line)
+		start += cut
+
+		for start < length && runes[start] == ' ' {
+			start++
+		}
+
+		currentWidth = otherWidth
+	}
+
+	return lines
+}
+
+// summaryCutPoint находит оптимальную точку обрезания текста
+// @param runes Срез символов текста
+// @param start Начальная позиция
+// @param width Ширина
+// @return int
+func summaryCutPoint(runes []rune, start, width int) int {
+	end := start + width
+	if end >= len(runes) {
+		return len(runes) - start
+	}
+	for i := end; i > start; i-- {
+		if runes[i-1] == ' ' {
+			return i - start
+		}
+	}
+	return width
+}
+
+func splitHeaderAndResult(lines []string, title string) ([]string, []string) {
+	if len(lines) == 0 {
+		return []string{""}, nil
+	}
+
+	separatorIdx := -1
+	for i, line := range lines {
+		if isSeparatorLine(line) {
+			separatorIdx = i
+			break
+		}
+	}
+
+	if separatorIdx != -1 {
+		header := append([]string(nil), lines[:separatorIdx]...)
+		if len(header) == 0 {
+			header = []string{""}
+		}
+
+		var result []string
+		if separatorIdx+1 < len(lines) {
+			result = append(result, lines[separatorIdx+1:]...)
+		}
+		return header, result
+	}
+
+	titlePlain := strings.TrimSpace(stripANSISequences(title))
+	header := []string{lines[0]}
+	resultStart := 1
+
+	for i := 1; i < len(lines); i++ {
+		raw := stripANSISequences(lines[i])
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			header = append(header, lines[i])
+			resultStart = i + 1
+			continue
+		}
+
+		normalized := strings.TrimLeft(trimmed, " "+ui.VerticalLineSymbol)
+		if normalized == "" {
+			header = append(header, lines[i])
+			resultStart = i + 1
+			continue
+		}
+
+		if titlePlain != "" && strings.Contains(titlePlain, normalized) {
+			header = append(header, lines[i])
+			resultStart = i + 1
+			continue
+		}
+
+		resultStart = i
+		break
+	}
+
+	var result []string
+	if resultStart < len(lines) {
+		result = append(result, lines[resultStart:]...)
+	}
+
+	if len(header) == 0 {
+		header = []string{""}
+	}
+
+	return header, result
+}
+
+func isSeparatorLine(line string) bool {
+	clean := stripANSISequences(line)
+	clean = strings.TrimSpace(clean)
+	if clean == "" {
+		return false
+	}
+
+	for _, r := range clean {
+		if string(r) != ui.HorizontalLineSymbol {
+			return false
+		}
+	}
+
+	return true
+}
+
+func stripANSISequences(s string) string {
+	var builder strings.Builder
+	builder.Grow(len(s))
+
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inEscape {
+			if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+				inEscape = false
+			}
+			continue
+		}
+
+		if c == 0x1b {
+			inEscape = true
+			continue
+		}
+
+		builder.WriteByte(c)
+	}
+
+	return builder.String()
+}
+
+// Run запускает очередь задач
+// @return error
 func (m *Model) Run() error {
 	// Если установлен флаг очистки экрана, очищаем экран перед запуском
 	if m.clearScreen {
@@ -287,13 +585,15 @@ func (m *Model) Run() error {
 }
 
 // WithTitleColor устанавливает цвет заголовка.
+// @param titleColor Цвет заголовка
+// @param bold Жирный стиль
+// @return Указатель на очередь задач
 func (m *Model) WithTitleColor(titleColor lipgloss.TerminalColor, bold bool) *Model {
 	m.titleStyle = lipgloss.NewStyle().Foreground(titleColor).Bold(bold)
 	return m
 }
 
 // WithAppName устанавливает название приложения.
-//
 // @param appName Название приложения
 // @param version Необязательная строка версии приложения
 // @return Указатель на очередь задач
@@ -317,7 +617,6 @@ func (m *Model) WithAppName(appName string, version ...string) *Model {
 }
 
 // WithAppNameStyle устанавливает стиль названия приложения.
-//
 // @param textColor Цвет текста
 // @param bold Флаг, указывающий, нужно ли сделать текст курсивом
 // @return Указатель на очередь задач
@@ -327,7 +626,6 @@ func (m *Model) WithAppNameColor(textColor lipgloss.TerminalColor, bold bool) *M
 }
 
 // WithSummary устанавливает флаг отображения сводки.
-//
 // @param show Флаг, указывающий, нужно ли отображать сводку
 // @return Указатель на очередь задач
 func (m *Model) WithSummary(show bool) *Model {
@@ -336,10 +634,8 @@ func (m *Model) WithSummary(show bool) *Model {
 }
 
 // WithClearScreen устанавливает флаг очистки экрана перед запуском очереди задач.
-//
 // @param clear Флаг, указывающий, нужно ли очищать экран перед запуском очереди задач
 // @param hardClear Флаг, указывающий, нужно ли использовать твердую очистку экрана (true) или нет (false)
-//
 // @return Указатель на очередь задач
 func (m *Model) WithClearScreen(clear bool, hardClear ...bool) *Model {
 	m.clearScreen = clear
@@ -353,7 +649,6 @@ func (m *Model) WithClearScreen(clear bool, hardClear ...bool) *Model {
 // Если enabled=true, то перед каждым результатом задачи будет добавляться разделительная линия
 // из префикса и указанного количества символов "─".
 // При enabled=false поведение остается как и раньше - результаты выводятся сразу после строки с задачей.
-//
 // @param enabled - включить/выключить форматирование
 func (m *Model) WithResultFormatting(enabled bool) *Model {
 	m.resultFormattingEnabled = enabled
@@ -361,6 +656,9 @@ func (m *Model) WithResultFormatting(enabled bool) *Model {
 	return m
 }
 
+// applySelectionSeparatorFlag применяет флаг разделительной линии для задач
+// @param tasks Список задач
+// @return void
 func (m *Model) applySelectionSeparatorFlag(tasks []common.Task) {
 	for _, task := range tasks {
 		if setter, ok := task.(selectionSeparatorSetter); ok {
@@ -370,7 +668,6 @@ func (m *Model) applySelectionSeparatorFlag(tasks []common.Task) {
 }
 
 // SetErrorColor устанавливает цвет для отображения ошибок в очереди.
-//
 // @param color Цвет ошибки
 // @return Указатель на очередь задач
 func (m *Model) SetErrorColor(color ErrorColor) *Model {
@@ -388,14 +685,12 @@ func (m *Model) SetErrorColor(color ErrorColor) *Model {
 
 // layoutWidth вычисляет ширину для рендеринга задач.
 // Использует функцию из пакета common.
-//
 // @return Ширина для рендеринга задач
 func (m *Model) layoutWidth() int {
 	return common.CalculateLayoutWidth(m.width)
 }
 
 // Init запускает первую задачу.
-//
 // @return Команда для запуска первой задачи
 func (m *Model) Init() tea.Cmd {
 	if len(m.tasks) > 0 {
@@ -405,7 +700,6 @@ func (m *Model) Init() tea.Cmd {
 }
 
 // setTitle прорисовывает заголовок
-//
 // @param width Ширина окна
 // @return Строка заголовка
 func (m *Model) setTitle(width int) string {
@@ -430,7 +724,6 @@ func (m *Model) setTitle(width int) string {
 }
 
 // Update обрабатывает сообщения и делегирует их задачам.
-//
 // @param msg Сообщение
 // @return Обновленная модель и команда
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -493,7 +786,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View отображает список задач.
-//
 // @return string - отображаемый список задач
 func (m *Model) View() string {
 
@@ -593,37 +885,7 @@ func (m *Model) View() string {
 				summaryStyle = ui.SubtleStyle
 			}
 
-			// Разделяем линию только если есть задачи с результатом
-			var separator string
-			// separator = performance.FastConcat(
-			// 	"  ", ui.VerticalLineSymbol, "\n",
-			// )
-			// // Добавляем разделитель перед итоговой строкой
-			// if hasHiddenResultLine(m.tasks) {
-			// 	separator = performance.FastConcat(
-			// 		separator,
-			// 		"  ", ui.VerticalLineSymbol, "\n",
-			// 	)
-			// }
-
-			// Создаем левую часть футера
-			leftPart := performance.FastConcat(
-				"  ", ui.FinishedLabelStyle.Render(ui.TaskCompletedSymbol), "  ",
-				summaryStyle.Render(leftSummary), "  ",
-			)
-
-			// Создаем правую часть футера
-			rightPart := rightStyle.Render(rightStatus)
-
-			// Выравниваем по ширине макета и добавляем финальные линии
-			footerLine := ui.AlignTextToRight(leftPart, rightPart, layoutWidth)
-			footer := performance.FastConcat(
-				separator,
-				footerLine,
-				"\n\n",
-				ui.DrawLine(layoutWidth),
-				"\n",
-			)
+			footer := m.renderSummaryFooter(leftSummary, rightStatus, layoutWidth, summaryStyle, rightStyle)
 			sb.WriteString(footer)
 		} else {
 			// Убираем висящий префикс вертикальной линии перед пустой строкой
@@ -747,11 +1009,14 @@ func (m *Model) formatTaskResult(task common.Task, width int, stripVerticalPrefi
 		return taskView
 	}
 
-	// Первая строка - это заголовок задачи, добавляем её как есть
-	result.WriteString(lines[0])
+	// Отделяем заголовок от дополнительных строк результата
+	headerLines, resultLines := splitHeaderAndResult(lines, task.Title())
+
+	// Добавляем заголовок полностью (включая перенесенные строки)
+	result.WriteString(strings.Join(headerLines, "\n"))
 
 	// Если есть дополнительные строки (результаты), добавляем разделительную линию
-	if len(lines) > 1 {
+	if len(resultLines) > 0 {
 		result.WriteString("\n")
 
 		// Определяем стиль линии на основе типа результата задачи
@@ -778,11 +1043,10 @@ func (m *Model) formatTaskResult(task common.Task, width int, stripVerticalPrefi
 		result.WriteString(separatorLine + "\n")
 
 		// Добавляем остальные строки результата
-		for i := 1; i < len(lines); i++ {
-			if strings.TrimSpace(lines[i]) != "" { // Пропускаем пустые строки
-				// Строки результата уже содержат префикс, просто добавляем их
-				result.WriteString(lines[i])
-				if i < len(lines)-1 { // Добавляем перенос строки, кроме последней строки
+		for i, line := range resultLines {
+			if strings.TrimSpace(line) != "" {
+				result.WriteString(line)
+				if i < len(resultLines)-1 {
 					result.WriteString("\n")
 				}
 			}

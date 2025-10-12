@@ -93,7 +93,6 @@ func isMemoryConstrained() bool {
 // parseMemoryLimit парсит строку с лимитом памяти (например "64MB", "128KB", "1GB")
 func parseMemoryLimit(limitStr string) (uint64, error) {
 	s := strings.TrimSpace(limitStr)
-	s = strings.ReplaceAll(s, "_", "")
 	s = strings.ToUpper(s)
 
 	var multiplier uint64 = 1
@@ -130,11 +129,41 @@ func parseMemoryLimit(limitStr string) (uint64, error) {
 	if numStr == "" {
 		return 0, fmt.Errorf("empty number")
 	}
-	num, err := strconv.ParseUint(numStr, 10, 64)
+	cleanNum, err := normalizeNumberString(numStr)
+	if err != nil {
+		return 0, err
+	}
+	num, err := strconv.ParseUint(cleanNum, 10, 64)
 	if err != nil {
 		return 0, err
 	}
 	return num * multiplier, nil
+}
+
+func normalizeNumberString(num string) (string, error) {
+	if !strings.Contains(num, "_") {
+		return num, nil
+	}
+
+	parts := strings.Split(num, "_")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("invalid numeric format")
+	}
+
+	for i, part := range parts {
+		if part == "" {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+		if i == 0 {
+			if len(part) == 0 || len(part) > 3 {
+				return "", fmt.Errorf("invalid numeric format")
+			}
+		} else if len(part) != 3 {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+	}
+
+	return strings.Join(parts, ""), nil
 }
 
 // firstNonEmpty возвращает первый непустой (после TrimSpace) элемент

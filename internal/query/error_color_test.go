@@ -69,8 +69,8 @@ func TestSetErrorColorInQueue(t *testing.T) {
 	model.updateTaskStats()
 
 	// Проверяем, что глобальные стили изменились
-	assert.Equal(t, Red, ui.GetErrorMessageStyle().GetForeground())
-	assert.Equal(t, Red, ui.GetErrorStatusStyle().GetForeground())
+	assert.Equal(t, ui.ColorDarkRed, ui.GetErrorMessageStyle().GetForeground())
+	assert.Equal(t, ui.ColorBrightRed, ui.GetErrorStatusStyle().GetForeground())
 
 	// Получаем представление
 	view := model.View()
@@ -102,8 +102,8 @@ func TestSetErrorColorChaining(t *testing.T) {
 	assert.Contains(t, model.appName, "TestApp")
 
 	// Проверяем, что цвет ошибок установился
-	assert.Equal(t, Red, ui.GetErrorMessageStyle().GetForeground())
-	assert.Equal(t, Red, ui.GetErrorStatusStyle().GetForeground())
+	assert.Equal(t, ui.ColorDarkRed, ui.GetErrorMessageStyle().GetForeground())
+	assert.Equal(t, ui.ColorBrightRed, ui.GetErrorStatusStyle().GetForeground())
 
 	// Сбрасываем стили
 	ui.ResetErrorColors()
@@ -118,10 +118,10 @@ func TestMultipleErrorColorChanges(t *testing.T) {
 
 	// Изменяем цвет несколько раз
 	model.SetErrorColor(Red)
-	assert.Equal(t, Red, ui.GetErrorStatusStyle().GetForeground())
+	assert.Equal(t, ui.ColorBrightRed, ui.GetErrorStatusStyle().GetForeground())
 
 	model.SetErrorColor(Orange)
-	assert.Equal(t, Orange, ui.GetErrorStatusStyle().GetForeground())
+	assert.Equal(t, ui.ColorBrightOrange, ui.GetErrorStatusStyle().GetForeground())
 
 	// Сбрасываем
 	ui.ResetErrorColors()
@@ -159,7 +159,7 @@ func TestErrorColorWithDifferentTasks(t *testing.T) {
 	assert.Contains(t, view, defaults.StatusProblem, "Должен быть статус с ошибками")
 
 	// Проверяем, что цвет установился правильно
-	assert.Equal(t, Orange, ui.GetErrorStatusStyle().GetForeground())
+	assert.Equal(t, ui.ColorBrightOrange, ui.GetErrorStatusStyle().GetForeground())
 
 	// Сбрасываем
 	ui.ResetErrorColors()

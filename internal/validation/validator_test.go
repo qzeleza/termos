@@ -15,23 +15,24 @@ func TestPasswordValidator(t *testing.T) {
 	assert.NotNil(t, validator)
 	assert.Contains(t, validator.Description(), "Пароль", "Описание должно содержать 'Пароль'")
 
-	// Тест валидных паролей (простые, так как API изменился)
+	// Тест валидных паролей, соответствующих всем требованиям
 	validPasswords := []string{
-		"password123",
-		"simplepass",
-		"12345678",
+		"Passw0rd!",
+		"Example#123A",
+		"Str0ng!Key",
 	}
 	for _, password := range validPasswords {
-		// Проверяем, что валидатор не паникует
-		if err := validator.Validate(password); err != nil {
-			t.Errorf("Ошибка валидации пароля: %v", err)
-		}
+		err := validator.Validate(password)
+		assert.NoError(t, err, "Валидный пароль '%s' не должен вызывать ошибку", password)
 	}
 
 	// Тест невалидных паролей
 	invalidPasswords := []string{
-		"short", // слишком короткий
-		"",      // пустой
+		"short",       // слишком короткий
+		"",            // пустой
+		"password123", // нет заглавных и спецсимволов
+		"PASSWORD!!!", // нет цифр и строчных
+		"SimplePass",  // нет цифр и спецсимволов
 	}
 	for _, password := range invalidPasswords {
 		err := validator.Validate(password)

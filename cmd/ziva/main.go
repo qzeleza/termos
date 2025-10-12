@@ -9,11 +9,21 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/qzeleza/ziva"
+	"github.com/qzeleza/ziva/internal/common"
+	"github.com/qzeleza/ziva/internal/defaults"
 	"github.com/qzeleza/ziva/internal/task"
+)
+
+var (
+	memoryLimitDemoFlag   = flag.String("memory-limit", "", "строка лимита памяти для демонстрации строгого парсинга (например, 512MB, 1_5GB)")
+	summaryWidthDemoFlag  = flag.Int("demo-summary-width", 60, "ширина в символах для предпросмотра форматирования итоговой сводки")
+	summaryTextDemoFlag   = flag.String("demo-summary-text", "", "кастомный текст сводки для демонстрации переноса строк")
+	showSummaryPreviewFlg = flag.Bool("demo-summary-preview", true, "выводить предпросмотр форматирования итоговой сводки в лог перед запуском TUI")
 )
 
 // pingResult представляет результат проверки подключения
@@ -28,6 +38,35 @@ func main() {
 	activeLang := configureLanguage()
 	warnTerminalCapabilities(activeLang)
 	ziva.SetDefaultLanguage("ru")
+
+	// Демонстрация строгого парсинга лимитов памяти
+	if limit := strings.TrimSpace(*memoryLimitDemoFlag); limit != "" {
+		if bytes, err := parseMemoryLimitForDemo(limit); err != nil {
+			log.Printf("⚙️  Парсер лимитов памяти: значение %q отклонено: %v", limit, err)
+		} else {
+			log.Printf("⚙️  Парсер лимитов памяти: значение %q принято (%d байт)", limit, bytes)
+		}
+	}
+
+	// Настраиваем текст сводки для демонстрации переноса по ширине
+	defaultSummary := "Итог развертывания: проверены все подсистемы и подготовлены рекомендации для последующих шагов.\nПожалуйста, просмотрите сводку, чтобы увидеть форматирование длинного текста."
+	if customText := strings.TrimSpace(*summaryTextDemoFlag); customText != "" {
+		defaultSummary = customText
+	}
+	defaults.SummaryCompleted = defaultSummary
+
+	if *showSummaryPreviewFlg {
+		layoutWidth := ziva.CalculateLayoutWidth(*summaryWidthDemoFlag)
+		log.Printf("🛈 Предпросмотр сводки (ширина %d):", layoutWidth)
+		for _, line := range previewSummaryLines(defaultSummary, layoutWidth) {
+			log.Printf("   %s", line)
+		}
+	}
+
+	// Демонстрируем управление стилями для пунктов «Назад» и «Выход»
+	ziva.SetExitMenuItemStyle()                            // подсветка без аргументов
+	ziva.SetBackMenuItemStyle(ziva.MenuItemDefaultStyle()) // возврат оставляем белым
+	log.Println("🛈 Стиль меню: «Выход» подсвечен ярким цианом, «Назад» оставлен в базовом стиле для сравнения.")
 
 	// Заголовок и краткое описание для TUI
 	header := "Демонстрация всех типов задач Жива™"
@@ -98,13 +137,12 @@ func main() {
 	// Создаем очередь и добавляем задачи
 	queue := ziva.NewQueue(header)
 	queue.WithAppName("Жива™", "версия 1.0.0")
-	queue.WithOutResultLine()
-	queue.WithOutSummary()
+	// queue.WithOutResultLine()
 	// queue.WithTasksNumbered(false, "[%d]")
 
 	// 1) Задачи мультивыбора (без и с пунктом "Выбрать все")
 	//    Пример без "Выбрать все"
-	ms1 := ziva.NewMultiSelectTask("Выберите компоненты установки", msel).
+	ms1 := ziva.NewMultiSelectTask("Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки", msel).
 		WithViewport(15, false).
 		WithTimeout(3*time.Second, []string{componentCLI, componentServer}).
 		WithItemsDisabled([]string{componentAgent, componentWeb})
@@ -148,7 +186,7 @@ func main() {
 		{Key: "waf", Name: "WAF", Description: "Веб-фильтр для приложений"},
 	}
 
-	securityTask := ziva.NewMultiSelectTask("Минимальные требования безопасности", securityItems).
+	securityTask := ziva.NewMultiSelectTask("Минимальные требования безопасности мумолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.", securityItems).
 		WithViewport(3, false).
 		WithRequireSelection(true)
 
@@ -162,7 +200,7 @@ func main() {
 
 	// 2) Одиночный выбор
 	ss := ziva.NewSingleSelectTask(
-		"Выберите среду развертывания",
+		"Выберите среду развертывания Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки Выберите компоненты установки",
 		ssel,
 	).WithViewport(9).
 		// WithTimeout(3*time.Second, envStaging).
@@ -182,7 +220,7 @@ func main() {
 	if errorTaskRun {
 		data := pingResult{}
 		fn = ziva.NewFuncTask(
-			"Проверка соединения",
+			"Проверка соединения умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
 			func() error {
 				// return checkConnection(&data)
 				return errors.New("симуляция ошибки в середине выполнения очереди\nне ясная причина стимуляции проблемы\nдополнительная информация")
@@ -201,7 +239,7 @@ func main() {
 	}
 	// 5) Подтверждение Да/Нет (например, для сохранения настроек)
 	// Используем языко-независимый метод вместо строки "Да"
-	ys := ziva.NewYesNoTask("Сохранение конфигурации", "Сохранить изменения?").
+	ys := ziva.NewYesNoTask("Сохранение конфигурации мумолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.", "Сохранить изменения? ").
 		WithTimeoutYes(2 * time.Second)
 	// ys.WithoutResultLine()
 	ys.WithNoAsError()
@@ -210,15 +248,26 @@ func main() {
 		WithValidator(v.Required())
 
 	inDefault := task.NewInputTaskNew(
-		"Поле со значением по умолчанию",
+		"Поле со значением по умолчанию значение по умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
 		"Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
 	).WithValidator(v.Required()).
-		WithTimeout(45*time.Second, "значение по умолчанию")
+		WithTimeout(45*time.Second, "значение по умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.")
 	inDefault.ShowTimeout(true)
-	inDefault.WithPlaceholder("значение по умолчанию")
+	inDefault.WithPlaceholder("значение по умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.")
 
 	queue.AddTasks(
 		inDefault,
+		fn,
+		securityTask,
+		ys,
+		ms1,
+		diagnosticsTask,
+		inRequired,
+	)
+
+	// очередь-заглушка, сюда добавляем задачи, которые не ходим пока чтобы они выполнялись
+	queue1 := ziva.NewQueue(header)
+	queue1.AddTasks(
 		ms1,
 		diagnosticsTask,
 		securityTask,
@@ -228,7 +277,6 @@ func main() {
 		fn,
 		ss,
 	)
-
 	// inUsername := ziva.NewInputTask("Имя пользователя", "Введите username:").
 	// 	WithValidator(v.Username()).
 	// 	WithTimeout(10*time.Second, "Alex")
@@ -296,6 +344,130 @@ func main() {
 		// Обработка ошибки
 		log.Fatalf("Ошибка при запуске очереди: %v", err)
 	}
+}
+
+func parseMemoryLimitForDemo(limitStr string) (uint64, error) {
+	s := strings.TrimSpace(limitStr)
+	s = strings.ToUpper(s)
+
+	var multiplier uint64 = 1
+	var numStr string
+
+	switch {
+	case strings.HasSuffix(s, "B") && !strings.HasSuffix(s, "KB") && !strings.HasSuffix(s, "MB") && !strings.HasSuffix(s, "GB") && !strings.HasSuffix(s, "KIB") && !strings.HasSuffix(s, "MIB") && !strings.HasSuffix(s, "GIB"):
+		multiplier = 1
+		numStr = strings.TrimSuffix(s, "B")
+	case strings.HasSuffix(s, "KIB"):
+		multiplier = 1024
+		numStr = strings.TrimSuffix(s, "KIB")
+	case strings.HasSuffix(s, "MIB"):
+		multiplier = 1024 * 1024
+		numStr = strings.TrimSuffix(s, "MIB")
+	case strings.HasSuffix(s, "GIB"):
+		multiplier = 1024 * 1024 * 1024
+		numStr = strings.TrimSuffix(s, "GIB")
+	case strings.HasSuffix(s, "KB"):
+		multiplier = 1024
+		numStr = strings.TrimSuffix(s, "KB")
+	case strings.HasSuffix(s, "MB"):
+		multiplier = 1024 * 1024
+		numStr = strings.TrimSuffix(s, "MB")
+	case strings.HasSuffix(s, "GB"):
+		multiplier = 1024 * 1024 * 1024
+		numStr = strings.TrimSuffix(s, "GB")
+	default:
+		numStr = s
+	}
+
+	numStr = strings.TrimSpace(numStr)
+	if numStr == "" {
+		return 0, fmt.Errorf("empty number")
+	}
+
+	cleanNum, err := normalizeNumberForDemo(numStr)
+	if err != nil {
+		return 0, err
+	}
+
+	value, err := strconv.ParseUint(cleanNum, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return value * multiplier, nil
+}
+
+func normalizeNumberForDemo(num string) (string, error) {
+	if !strings.Contains(num, "_") {
+		return num, nil
+	}
+
+	parts := strings.Split(num, "_")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("invalid numeric format")
+	}
+
+	for i, part := range parts {
+		if part == "" {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+		if i == 0 {
+			if len(part) == 0 || len(part) > 3 {
+				return "", fmt.Errorf("invalid numeric format")
+			}
+		} else if len(part) != 3 {
+			return "", fmt.Errorf("invalid numeric format")
+		}
+	}
+
+	return strings.Join(parts, ""), nil
+}
+
+func previewSummaryLines(summary string, width int) []string {
+	if width <= 0 {
+		width = 60
+	}
+
+	effectiveWidth := width - common.LayoutWrapMargin
+	if effectiveWidth < 1 {
+		effectiveWidth = 1
+	}
+
+	text := strings.ReplaceAll(summary, "\n", " ")
+	text = strings.Join(strings.Fields(text), " ")
+	if text == "" {
+		return []string{}
+	}
+
+	runes := []rune(text)
+	var lines []string
+	start := 0
+	for start < len(runes) {
+		end := start + effectiveWidth
+		if end >= len(runes) {
+			lines = append(lines, string(runes[start:]))
+			break
+		}
+
+		cut := end
+		for cut > start && runes[cut-1] != ' ' {
+			cut--
+		}
+		if cut == start {
+			cut = end
+		}
+
+		line := strings.TrimSpace(string(runes[start:cut]))
+		if line != "" {
+			lines = append(lines, line)
+		}
+
+		start = cut
+		for start < len(runes) && runes[start] == ' ' {
+			start++
+		}
+	}
+
+	return lines
 }
 
 func checkConnection(result *pingResult) error {

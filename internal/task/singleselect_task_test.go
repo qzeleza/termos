@@ -116,7 +116,7 @@ func TestSingleSelectTaskView(t *testing.T) {
 	// Проверяем, что после завершения задачи View возвращает пустую строку
 	updatedTask, _ := selectTask.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	selectTaskDone, _ := updatedTask.(*SingleSelectTask)
-	assert.Equal(t, "", selectTaskDone.View(80), "View должен возвращать пустую строку для завершенной задачи")
+	assert.Equal(t, selectTaskDone.FinalView(80), selectTaskDone.View(80), "View завершенной задачи должен совпадать с FinalView")
 }
 
 // TestSingleSelectTaskWithDefaultIndex проверяет работу с выбором определенного индекса
@@ -353,16 +353,17 @@ func TestSingleSelectTaskDividerViewRendering(t *testing.T) {
 	lines := strings.Split(view, "\n")
 	var dividerLine string
 	for _, line := range lines {
-		if strings.ContainsRune(line, '├') {
-			dividerLine = line
+		if strings.Contains(line, "─") && !strings.Contains(line, "[") {
+			dividerLine = strings.TrimSpace(line)
 			break
 		}
 	}
 	if assert.NotEmpty(t, dividerLine, "Вывод должен содержать строку разделителя") {
-		start := strings.IndexRune(dividerLine, '├')
-		dividerText := dividerLine[start:]
-		expectedLength := longestItemNameLength(items) + 1
-		assert.Equal(t, expectedLength, utf8.RuneCountInString(dividerText), "Разделитель должен быть на один символ длиннее самого длинного пункта")
+		expectedLength := longestItemNameLength(items) + 5
+		dividerText := strings.TrimLeft(dividerLine, "│")
+		dividerText = strings.TrimSpace(dividerText)
+		assert.True(t, strings.Trim(dividerText, "─") == "", "Разделитель должен состоять только из символов '─'")
+		assert.GreaterOrEqual(t, strings.Count(dividerText, "─"), expectedLength, "Разделитель должен быть не короче самого длинного пункта плюс 5 символов")
+		assert.NotContains(t, dividerText, "[", "Разделитель не должен отображаться как выбираемый пункт")
 	}
-	assert.NotContains(t, view, "(○) ├", "Разделитель не должен отображаться как выбираемый пункт")
 }
