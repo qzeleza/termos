@@ -6,9 +6,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"reflect"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/qzeleza/ziva/internal/performance"
-	"reflect"
 )
 
 var (
@@ -69,8 +70,8 @@ var (
 	SelectionStyle       = lipgloss.NewStyle().Foreground(ColorBrightGreen)             // Выделение (Да): ярко-зелёный
 	SelectionNoStyle     = lipgloss.NewStyle().Foreground(ColorBrightRed).Bold(true)    // Выделение (Нет): ярко-красный
 	ActiveStyle          = lipgloss.NewStyle().Foreground(ColorLightBlue).Bold(true)    // Активный элемент: ярко-синий
-	MenuExitItemStyle    = menuActionDefaultStyle()                                     // По умолчанию кнопки выхода подсвечены
-	MenuBackItemStyle    = menuActionDefaultStyle()                                     // По умолчанию кнопки возврата подсвечены
+	MenuExitItemStyle    = menuItemPlainStyle()                                         // По умолчанию кнопки выхода белые
+	MenuBackItemStyle    = menuItemPlainStyle()                                         // По умолчанию кнопки возврата белые
 	InputStyle           = lipgloss.NewStyle().Foreground(ColorLightBlue).Bold(true)    // Стиль для активного ввода
 	SpinnerStyle         = lipgloss.NewStyle().Foreground(ColorLightBlue).Bold(true)    // Стиль для спиннера
 	ActiveTitleStyle     = lipgloss.NewStyle().Foreground(ColorBrightGreen).Bold(true)  // Активный заголовок ввода
@@ -97,10 +98,16 @@ var (
 	MessageIndent = strings.Repeat(" ", MessageIndentSpaces) // Отступ для сообщений об ошибках
 )
 
+// menuActionDefaultStyle возвращает стиль подсветки для специальных пунктов меню (яркий циан, жирный).
+// По умолчанию подсветка пунктов меню имеет стиль - яркий циан, жирный.
 func menuActionDefaultStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Foreground(ColorBrightCyan).
 		Bold(true)
+}
+
+func menuItemPlainStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(ColorBrightWhite)
 }
 
 // MenuActionDefaultStyle возвращает стиль подсветки для специальных пунктов меню.
@@ -110,7 +117,7 @@ func MenuActionDefaultStyle() lipgloss.Style {
 
 // MenuItemPlainStyle возвращает стиль, совпадающий с обычными пунктами меню (белый текст).
 func MenuItemPlainStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(ColorBrightWhite)
+	return menuItemPlainStyle()
 }
 
 func isStyleEmpty(style lipgloss.Style) bool {
@@ -402,33 +409,47 @@ func SetErrorColor(errorsColor lipgloss.TerminalColor, statusColor lipgloss.Term
 }
 
 // SetMenuExitItemStyle обновляет стиль для пунктов меню выхода.
-// Пустой стиль сбрасывает подсветку к значениям по умолчанию.
-func SetMenuExitItemStyle(style lipgloss.Style) {
-	if isStyleEmpty(style) {
+// Без аргументов подсвечивает пункты и возвращает яркий циан + жирный.
+// Пустой стиль в аргументе сбрасывает оформление к белому тексту.
+func SetMenuExitItemStyle(styles ...lipgloss.Style) {
+	if len(styles) == 0 {
 		MenuExitItemStyle = menuActionDefaultStyle()
+		return
+	}
+
+	style := styles[0]
+	if isStyleEmpty(style) {
+		MenuExitItemStyle = menuItemPlainStyle()
 		return
 	}
 	MenuExitItemStyle = style
 }
 
-// ResetMenuExitItemStyle сбрасывает стиль пункта выхода к значениям по умолчанию.
+// ResetMenuExitItemStyle сбрасывает стиль пункта выхода к белому тексту по умолчанию.
 func ResetMenuExitItemStyle() {
-	MenuExitItemStyle = menuActionDefaultStyle()
+	MenuExitItemStyle = menuItemPlainStyle()
 }
 
 // SetMenuBackItemStyle обновляет стиль для пунктов меню возврата.
-// Пустой стиль сбрасывает подсветку к значениям по умолчанию.
-func SetMenuBackItemStyle(style lipgloss.Style) {
-	if isStyleEmpty(style) {
+// Без аргументов подсвечивает пункты и возвращает яркий циан + жирный.
+// Пустой стиль в аргументе сбрасывает оформление к белому тексту.
+func SetMenuBackItemStyle(styles ...lipgloss.Style) {
+	if len(styles) == 0 {
 		MenuBackItemStyle = menuActionDefaultStyle()
+		return
+	}
+
+	style := styles[0]
+	if isStyleEmpty(style) {
+		MenuBackItemStyle = menuItemPlainStyle()
 		return
 	}
 	MenuBackItemStyle = style
 }
 
-// ResetMenuBackItemStyle сбрасывает стиль пункта "Назад" к значениям по умолчанию.
+// ResetMenuBackItemStyle сбрасывает стиль пункта "Назад" к белому тексту по умолчанию.
 func ResetMenuBackItemStyle() {
-	MenuBackItemStyle = menuActionDefaultStyle()
+	MenuBackItemStyle = menuItemPlainStyle()
 }
 
 // ResetErrorColors сбрасывает цвета ошибок к значениям по умолчанию

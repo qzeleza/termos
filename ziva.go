@@ -83,25 +83,27 @@ func DisableCompletionDelay() {
 }
 
 // SetExitMenuItemStyle обновляет стиль отображения пунктов меню выхода.
-// Передайте ziva.MenuActionDefaultStyle() для стандартной подсветки
-// или ziva.MenuItemDefaultStyle() для оформления как обычных пунктов.
-func SetExitMenuItemStyle(style lipgloss.Style) {
-	ui.SetMenuExitItemStyle(style)
+// Без аргументов подсвечивает пункты (яркий циан, жирный). Передайте ziva.MenuItemDefaultStyle()
+// для оформления как обычных пунктов (белый текст) или любой другой стиль.
+// По умолчанию, если вы не вызываете эту функцию, пункты меню выхода отображаются белым текстом.
+func SetExitMenuItemStyle(styles ...lipgloss.Style) {
+	ui.SetMenuExitItemStyle(styles...)
 }
 
 // SetBackMenuItemStyle обновляет стиль отображения пунктов меню возврата.
-// Передайте ziva.MenuActionDefaultStyle() для стандартной подсветки
-// или ziva.MenuItemDefaultStyle() для оформления как обычных пунктов.
-func SetBackMenuItemStyle(style lipgloss.Style) {
-	ui.SetMenuBackItemStyle(style)
+// Без аргументов подсвечивает пункты (яркий циан, жирный). Передайте ziva.MenuItemDefaultStyle()
+// для оформления как обычных пунктов (белый текст) или любой другой стиль.
+// По умолчанию, если вы не вызываете эту функцию, пункты меню возврата отображаются белым текстом.
+func SetBackMenuItemStyle(styles ...lipgloss.Style) {
+	ui.SetMenuBackItemStyle(styles...)
 }
 
-// ResetExitMenuItemStyle возвращает стиль пункта выхода к подсвеченному значению по умолчанию.
+// ResetExitMenuItemStyle возвращает стиль пункта выхода к белому значению по умолчанию.
 func ResetExitMenuItemStyle() {
 	ui.ResetMenuExitItemStyle()
 }
 
-// ResetBackMenuItemStyle возвращает стиль пункта "Назад" к подсвеченному значению по умолчанию.
+// ResetBackMenuItemStyle возвращает стиль пункта "Назад" к белому значению по умолчанию.
 func ResetBackMenuItemStyle() {
 	ui.ResetMenuBackItemStyle()
 }
