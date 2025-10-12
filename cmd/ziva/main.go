@@ -209,7 +209,16 @@ func main() {
 	inRequired := task.NewInputTaskNew("Обязательное поле", "Нельзя оставлять пустым:").
 		WithValidator(v.Required())
 
+	inDefault := task.NewInputTaskNew(
+		"Поле со значением по умолчанию",
+		"Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
+	).WithValidator(v.Required()).
+		WithTimeout(45*time.Second, "значение по умолчанию")
+	inDefault.ShowTimeout(true)
+	inDefault.WithPlaceholder("значение по умолчанию")
+
 	queue.AddTasks(
+		inDefault,
 		ms1,
 		diagnosticsTask,
 		securityTask,

@@ -42,11 +42,12 @@ type InputTaskNew struct {
 	errorHandler *terrors.ErrorHandler // Обработчик ошибок
 
 	// Состояние задачи
-	inputType     InputType // Тип ввода
-	validationErr error     // Ошибка валидации
-	value         string    // Введенное значение
-	prompt        string    // Подсказка для ввода
-	placeholder   string    // Текст-заполнитель
+	inputType             InputType // Тип ввода
+	validationErr         error     // Ошибка валидации
+	value                 string    // Введенное значение
+	prompt                string    // Подсказка для ввода
+	placeholder           string    // Текст-заполнитель
+	placeholderCustomized bool
 
 	// Настройки
 	width                   int  // Полная ширина поля ввода
@@ -75,17 +76,18 @@ func NewInputTaskNew(title, prompt string) *InputTaskNew {
 	ti.Cursor.TextStyle = lipgloss.NewStyle().Foreground(ui.ColorLightBlue).Bold(true)
 
 	return &InputTaskNew{
-		BaseTask:      baseTask,
-		textInput:     ti,
-		renderer:      NewInputRenderer(),
-		errorHandler:  terrors.DefaultErrorHandler,
-		inputType:     InputTypeText,
-		prompt:        prompt,
-		placeholder:   defaults.DefaultPlaceholder,
-		width:         width,
-		visibleLength: visibleLength,
-		maskInput:     false,
-		allowEmpty:    false,
+		BaseTask:              baseTask,
+		textInput:             ti,
+		renderer:              NewInputRenderer(),
+		errorHandler:          terrors.DefaultErrorHandler,
+		inputType:             InputTypeText,
+		prompt:                prompt,
+		placeholder:           defaults.DefaultPlaceholder,
+		placeholderCustomized: false,
+		width:                 width,
+		visibleLength:         visibleLength,
+		maskInput:             false,
+		allowEmpty:            false,
 	}
 }
 
@@ -249,6 +251,7 @@ func inputPromptWidth() int {
 func (t *InputTaskNew) WithPlaceholder(placeholder string) *InputTaskNew {
 	t.placeholder = placeholder
 	t.textInput.Placeholder = placeholder
+	t.placeholderCustomized = true
 	return t
 }
 
@@ -321,6 +324,25 @@ func (t *InputTaskNew) Update(msg tea.Msg) (Task, tea.Cmd) {
 		case "ctrl+c", "esc", "Ctrl+C", "Esc":
 			// Отмена ввода
 			return t.handleCancel()
+		case "right", "Right":
+			if performance.TrimSpaceEfficient(t.textInput.Value()) == "" {
+				if value, defaultErr, _, hasDefault := t.resolveDefaultValue(); hasDefault {
+					if defaultErr != nil {
+						t.validationErr = defaultErr
+						t.SetError(defaultErr)
+					} else {
+						t.textInput.SetValue(value)
+						t.textInput.SetCursor(utf8.RuneCountInString(value))
+						t.validationErr = nil
+						t.SetError(nil)
+						t.validateInput()
+					}
+					return t, nil
+				}
+			}
+			var cmd tea.Cmd
+			t.textInput, cmd = t.textInput.Update(msg)
+			return t, cmd
 		case "left", "Left":
 			// Обрабатываем выход по стрелке влево при пустом поле ввода
 			if performance.TrimSpaceEfficient(t.textInput.Value()) == "" {
@@ -405,9 +427,27 @@ func (t *InputTaskNew) validateInput() {
 // handleSubmit обрабатывает подтверждение ввода
 func (t *InputTaskNew) handleSubmit() (Task, tea.Cmd) {
 	currentValue := t.textInput.Value()
+	trimmed := performance.TrimSpaceEfficient(currentValue)
+
+	if trimmed == "" {
+		if value, defaultErr, _, hasDefault := t.resolveDefaultValue(); hasDefault {
+			if defaultErr != nil {
+				t.validationErr = defaultErr
+				t.SetError(defaultErr)
+				t.textInput.Focus()
+				return t, nil
+			}
+			t.textInput.SetValue(value)
+			t.textInput.SetCursor(utf8.RuneCountInString(value))
+			currentValue = value
+			trimmed = performance.TrimSpaceEfficient(currentValue)
+			t.validationErr = nil
+			t.SetError(nil)
+		}
+	}
 
 	// Финальная валидация
-	if !t.allowEmpty && performance.TrimSpaceEfficient(currentValue) == "" {
+	if !t.allowEmpty && trimmed == "" {
 		emptyErr := terrors.NewValidationError(t.title, errors.New(defaults.ErrFieldRequired)).
 			WithContext("required", true)
 		t.validationErr = emptyErr
@@ -461,61 +501,90 @@ func (t *InputTaskNew) getDisplayValue() string {
 	return t.value
 }
 
+func stringifyDefaultValue(value interface{}) (string, bool) {
+	switch v := value.(type) {
+	case nil:
+		return "", false
+	case string:
+		return v, true
+	case fmt.Stringer:
+		return v.String(), true
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v), true
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v), true
+	case float32, float64:
+		return fmt.Sprintf("%v", v), true
+	case bool:
+		return fmt.Sprintf("%t", v), true
+	default:
+		return fmt.Sprintf("%v", v), true
+	}
+}
+
+// resolveDefaultValue конвертирует и валидирует значение по умолчанию.
+// Возвращает строковое значение, ошибку валидации (если есть), сообщение для пользователя и флаг наличия значения.
+func (t *InputTaskNew) resolveDefaultValue() (string, *terrors.TaskError, string, bool) {
+	if t.defaultValue == nil {
+		return "", nil, "", false
+	}
+
+	var valueToSet string
+	switch val := t.defaultValue.(type) {
+	case string:
+		valueToSet = val
+	case int:
+		valueToSet = fmt.Sprintf("%d", val)
+	case float64:
+		valueToSet = fmt.Sprintf("%f", val)
+	default:
+		valueToSet = fmt.Sprintf("%v", val)
+	}
+
+	if t.validator != nil {
+		if err := t.validator.Validate(valueToSet); err != nil {
+			validationErr := terrors.NewValidationError(t.title, err).
+				WithContext("defauilt_value", true).
+				WithContext("input_type", t.inputType)
+			return "", validationErr, defaults.ErrDefaultValueInvalid, true
+		}
+	}
+
+	if !t.allowEmpty && performance.TrimSpaceEfficient(valueToSet) == "" {
+		emptyErr := terrors.NewValidationError(t.title, errors.New(defaults.ErrFieldRequired)).
+			WithContext("defauilt_value", true)
+		return "", emptyErr, defaults.ErrDefaultValueEmpty, true
+	}
+
+	return valueToSet, nil, "", true
+}
+
 // applyDefaultValue применяет значение по умолчанию при истечении таймера
 func (t *InputTaskNew) applyDefaultValue() {
-	// Если есть значение по умолчанию
-	if t.defaultValue != nil {
-		var valueToSet string
-
-		switch val := t.defaultValue.(type) {
-		case string:
-			valueToSet = val
-		case int:
-			valueToSet = fmt.Sprintf("%d", val)
-		case float64:
-			valueToSet = fmt.Sprintf("%f", val)
-		default:
-			// Попытаемся преобразовать любое значение в строку
-			valueToSet = fmt.Sprintf("%v", val)
-		}
-
-		// Проверяем валидность значения по умолчанию
-		if t.validator != nil {
-			if err := t.validator.Validate(valueToSet); err != nil {
-				// Если значение по умолчанию не прошло валидацию, завершаем с ошибкой
-				validationErr := terrors.NewValidationError(t.title, err).
-					WithContext("defauilt_value", true).
-					WithContext("input_type", t.inputType)
-				t.validationErr = validationErr
-				t.SetError(validationErr)
-				t.done = true
-				t.icon = ui.IconError
-				t.finalValue = ui.GetErrorMessageStyle().Render(defaults.ErrDefaultValueInvalid)
-				return
-			}
-		}
-
-		// Проверяем на пустоту, если пустые значения не разрешены
-		if !t.allowEmpty && performance.TrimSpaceEfficient(valueToSet) == "" {
-			emptyErr := terrors.NewValidationError(t.title, errors.New(defaults.ErrFieldRequired)).
-				WithContext("defauilt_value", true)
-			t.validationErr = emptyErr
-			t.SetError(emptyErr)
-			t.done = true
-			t.icon = ui.IconError
-			t.finalValue = ui.GetErrorMessageStyle().Render(defaults.ErrDefaultValueEmpty)
-			return
-		}
-
-		// Устанавливаем значение и завершаем задачу
-		t.textInput.SetValue(valueToSet)
-		t.value = valueToSet
-		t.done = true
-		t.icon = ui.IconDone
-		t.finalValue = ui.SuccessLabelStyle.Render(t.getDisplayValue())
-		t.validationErr = nil
-		t.SetError(nil)
+	valueToSet, defaultErr, failMessage, hasDefault := t.resolveDefaultValue()
+	if !hasDefault {
+		return
 	}
+
+	if defaultErr != nil {
+		t.validationErr = defaultErr
+		t.SetError(defaultErr)
+		t.done = true
+		t.icon = ui.IconError
+		if failMessage == "" {
+			failMessage = defaults.ErrDefaultValueInvalid
+		}
+		t.finalValue = ui.GetErrorMessageStyle().Render(failMessage)
+		return
+	}
+
+	t.textInput.SetValue(valueToSet)
+	t.value = valueToSet
+	t.done = true
+	t.icon = ui.IconDone
+	t.finalValue = ui.SuccessLabelStyle.Render(t.getDisplayValue())
+	t.validationErr = nil
+	t.SetError(nil)
 }
 
 // View отображает текущее состояние задачи
@@ -652,5 +721,11 @@ func (b *InputTaskBuilder) Build() *InputTaskNew {
 // @return Указатель на задачу для цепочки вызовов
 func (t *InputTaskNew) WithTimeout(duration time.Duration, defaultValue interface{}) *InputTaskNew {
 	t.BaseTask.WithTimeout(duration, defaultValue)
+	if !t.placeholderCustomized {
+		if placeholder, ok := stringifyDefaultValue(defaultValue); ok && performance.TrimSpaceEfficient(placeholder) != "" {
+			t.placeholder = placeholder
+			t.textInput.Placeholder = placeholder
+		}
+	}
 	return t
 }

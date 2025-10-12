@@ -565,6 +565,13 @@ func (t *InputTask) WithVisibleLength(length int) *InputTask {
 	return t
 }
 
+// WithPlaceholder устанавливает placeholder для поля ввода.
+// Пользовательский placeholder имеет приоритет над значением по умолчанию.
+func (t *InputTask) WithPlaceholder(placeholder string) *InputTask {
+	t.InputTaskNew.WithPlaceholder(placeholder)
+	return t
+}
+
 // GetValue возвращает введенное значение
 //
 // @return Введенное значение
