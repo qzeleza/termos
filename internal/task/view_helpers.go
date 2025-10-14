@@ -116,6 +116,41 @@ func formatNavigationHelpText(helpText string, width int) string {
 	return strings.Join(lines, "\n")
 }
 
+// formatItemDescriptionText переносит текст описания элементов списка по доступной ширине.
+// Сохраняет вручную заданные пустые строки и возвращает результат без отступов.
+func formatItemDescriptionText(description string, width int) string {
+	trimmed := strings.TrimSpace(description)
+	if trimmed == "" {
+		return ""
+	}
+
+	layoutWidth := common.CalculateLayoutWidth(width)
+	available := layoutWidth - ui.MainLeftIndent - common.LayoutWrapMargin
+	if available < 1 {
+		available = 1
+	}
+
+	lines := strings.Split(description, "\n")
+	formatted := make([]string, 0, len(lines))
+
+	for _, rawLine := range lines {
+		line := strings.TrimRight(rawLine, "\r")
+		if strings.TrimSpace(line) == "" {
+			formatted = append(formatted, "")
+			continue
+		}
+
+		wrapped := ui.WrapText(line, available)
+		if len(wrapped) == 0 {
+			formatted = append(formatted, "")
+			continue
+		}
+		formatted = append(formatted, wrapped...)
+	}
+
+	return strings.Join(formatted, "\n")
+}
+
 // indentLines добавляет отступ перед каждой строкой текста.
 func indentLines(text, indent string) string {
 	if text == "" {

@@ -40,19 +40,33 @@ func FormatErrorMessage(errMsg string, layoutWidth int, preserveNewLines bool) s
 
 	// Если нужно сохранить переносы строк
 	if preserveNewLines {
-		// Разбиваем сообщение по переносам строк
 		lines := strings.Split(errMsg, "\n")
 		result := performance.GetBuffer()
 		defer performance.PutBuffer(result)
 
-		for i, line := range lines {
-			if i > 0 {
-				result.WriteString("\n")
+		lineCount := 0
+		for _, rawLine := range lines {
+			line := strings.TrimRight(rawLine, "\r")
+			var segments []string
+			if strings.TrimSpace(line) == "" {
+				segments = []string{""}
+			} else {
+				segments = wrapText(line, wrapWidth)
+				if len(segments) == 0 {
+					segments = []string{""}
+				}
 			}
-			result.WriteString(indent)
-			result.WriteString(VerticalLineSymbol)
-			result.WriteString(performance.RepeatEfficient(" ", 3))
-			result.WriteString(GetErrorMessageStyle().Render(line))
+
+			for _, segment := range segments {
+				if lineCount > 0 {
+					result.WriteString("\n")
+				}
+				result.WriteString(indent)
+				result.WriteString(VerticalLineSymbol)
+				result.WriteString(performance.RepeatEfficient(" ", 3))
+				result.WriteString(GetErrorMessageStyle().Render(segment))
+				lineCount++
+			}
 		}
 
 		return result.String()

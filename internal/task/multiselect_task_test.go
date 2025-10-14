@@ -11,6 +11,7 @@ import (
 	"github.com/qzeleza/ziva/internal/defaults"
 	"github.com/qzeleza/ziva/internal/ui"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func makeMultiItems(values []string) []Item {
@@ -599,4 +600,37 @@ func TestMultiSelectDependenciesDisableAndEnable(t *testing.T) {
 	assert.False(t, task.isSelected(1))
 	assert.True(t, task.isDisabled(1))
 	assert.Equal(t, 0, task.cursor)
+}
+
+func TestMultiSelectTaskDescriptionWrapping(t *testing.T) {
+	description := "Описание элемента списка, которое должно автоматически разбиваться на несколько строк при отображении, чтобы текст подсказки не выходил за пределы доступной ширины."
+	items := []Item{
+		{Key: "first", Name: "Первый", Description: description},
+		{Key: "second", Name: "Второй"},
+	}
+
+	task := NewMultiSelectTask("Выберите элементы", items)
+	view := stripANSI(task.View(80))
+
+	descIndex := strings.Index(view, "Описание элемента списка")
+	require.Greater(t, descIndex, -1, "Описание должно присутствовать в выводе задачи")
+
+	helpIndex := strings.Index(view, defaults.MultiSelectHelp)
+	require.Greater(t, helpIndex, -1, "Подсказка навигации должна присутствовать в выводе задачи")
+	require.Less(t, descIndex, helpIndex, "Описание должно отображаться перед подсказкой навигации")
+
+	descSegment := view[descIndex:helpIndex]
+	lines := strings.Split(descSegment, "\n")
+
+	var nonEmpty []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmpty = append(nonEmpty, line)
+		}
+	}
+
+	assert.Greater(t, len(nonEmpty), 1, "Описание должно разбиваться на несколько строк")
+	for _, line := range nonEmpty {
+		assert.True(t, strings.HasPrefix(line, "  "), "Каждая строка описания должна содержать базовый отступ")
+	}
 }

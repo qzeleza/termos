@@ -611,7 +611,7 @@ func (t *SingleSelectTask) View(width int) string {
 			styledLabel := ui.DisabledStyle.Render(label) // Отображаемый текст с стилем
 			sb.WriteString(fmt.Sprintf("%s%s\n", itemPrefix, styledLabel))
 			if t.cursor == i && strings.TrimSpace(description) != "" {
-				activeHelp = description
+				activeHelp = formatItemDescriptionText(description, width)
 			}
 			continue
 		}
@@ -669,7 +669,7 @@ func (t *SingleSelectTask) View(width int) string {
 		}
 
 		if t.cursor == i && strings.TrimSpace(description) != "" {
-			activeHelp = description
+			activeHelp = formatItemDescriptionText(description, width)
 		}
 	}
 

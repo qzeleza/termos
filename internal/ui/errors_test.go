@@ -1,12 +1,19 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 )
+
+var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(input string) string {
+	return ansiRegexp.ReplaceAllString(input, "")
+}
 
 // TestFormatErrorMessageWithPreserveNewLines проверяет функцию форматирования сообщений об ошибках
 // с разными значениями параметра preserveNewLines
@@ -97,6 +104,30 @@ func TestFormatErrorMessageRespectsLayoutWidth(t *testing.T) {
 			continue
 		}
 		assert.LessOrEqual(t, lipgloss.Width(line), layoutWidth, "Каждая строка не должна превышать ширину макета")
+	}
+}
+
+func TestFormatErrorMessagePreserveNewLinesWrapsLongLines(t *testing.T) {
+	errMsg := "Очень длинное сообщение об ошибке, которое не содержит исходных переносов строк, но должно корректно переноситься при отображении с сохранением форматирования пользователя."
+	layoutWidth := 38
+
+	result := FormatErrorMessage(errMsg, layoutWidth, true)
+	lines := strings.Split(result, "\n")
+
+	// Должны появиться дополнительные строки
+	assert.Greater(t, len(lines), 1, "Сообщение должно разбиваться на несколько строк при сохранении переносов")
+
+	prefix := "  " + VerticalLineSymbol + "   "
+	for _, line := range lines {
+		plain := stripANSI(line)
+		if !strings.HasPrefix(plain, prefix) {
+			continue
+		}
+		content := strings.TrimSpace(strings.TrimPrefix(plain, prefix))
+		if content == "" {
+			continue
+		}
+		assert.LessOrEqual(t, lipgloss.Width(content), layoutWidth-lipgloss.Width(prefix), "Каждая строка текста ошибки должна укладываться в ширину макета")
 	}
 }
 

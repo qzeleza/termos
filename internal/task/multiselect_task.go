@@ -1243,7 +1243,7 @@ func (t *MultiSelectTask) View(width int) string {
 			styledLabel := ui.DisabledStyle.Render(label)
 			sb.WriteString(fmt.Sprintf("%s%s\n", itemPrefix, styledLabel))
 			if t.cursor == i && strings.TrimSpace(description) != "" {
-				activeHelp = description
+				activeHelp = formatItemDescriptionText(description, width)
 			}
 			continue
 		}
@@ -1290,7 +1290,7 @@ func (t *MultiSelectTask) View(width int) string {
 		sb.WriteString(fmt.Sprintf("%s%s%s%s %s\n", itemPrefix, openBracket, checked, closeBracket, label))
 
 		if t.cursor == i && strings.TrimSpace(description) != "" {
-			activeHelp = description
+			activeHelp = formatItemDescriptionText(description, width)
 		}
 	}
 

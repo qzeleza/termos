@@ -12,6 +12,7 @@ import (
 	"github.com/qzeleza/ziva/internal/defaults"
 	"github.com/qzeleza/ziva/internal/ui"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -365,5 +366,38 @@ func TestSingleSelectTaskDividerViewRendering(t *testing.T) {
 		assert.True(t, strings.Trim(dividerText, "─") == "", "Разделитель должен состоять только из символов '─'")
 		assert.GreaterOrEqual(t, strings.Count(dividerText, "─"), expectedLength, "Разделитель должен быть не короче самого длинного пункта плюс 5 символов")
 		assert.NotContains(t, dividerText, "[", "Разделитель не должен отображаться как выбираемый пункт")
+	}
+}
+
+func TestSingleSelectTaskDescriptionWrapping(t *testing.T) {
+	description := "Очень длинное описание опции, которое должно автоматически переноситься на новую строку для сохранения читабельности списка выбора даже на узких экранах приложения."
+	items := []Item{
+		{Key: "opt1", Name: "Опция 1", Description: description},
+		{Key: "opt2", Name: "Опция 2"},
+	}
+
+	task := NewSingleSelectTask("Выберите опцию", items)
+	view := stripANSI(task.View(80))
+
+	descIndex := strings.Index(view, "Очень длинное описание")
+	require.Greater(t, descIndex, -1, "Описание должно присутствовать в выводе")
+
+	helpIndex := strings.Index(view, defaults.SingleSelectHelp)
+	require.Greater(t, helpIndex, -1, "Текст подсказки навигации должен присутствовать в выводе")
+	require.Less(t, descIndex, helpIndex, "Описание должно выводиться перед подсказкой навигации")
+
+	descSegment := view[descIndex:helpIndex]
+	lines := strings.Split(descSegment, "\n")
+
+	var nonEmpty []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmpty = append(nonEmpty, line)
+		}
+	}
+
+	assert.Greater(t, len(nonEmpty), 1, "Описание должно переноситься на несколько строк")
+	for _, line := range nonEmpty {
+		assert.True(t, strings.HasPrefix(line, "  "), "Каждая строка описания должна содержать базовый отступ")
 	}
 }

@@ -181,9 +181,9 @@ func main() {
 		WithDefaultItems([]string{diagnosticLogging, diagnosticMetrics})
 
 	securityItems := []ziva.Item{
-		{Key: "firewall", Name: "Firewall", Description: "Базовая сетевой фильтр"},
-		{Key: "ids", Name: "IDS", Description: "Система обнаружения вторжений"},
-		{Key: "waf", Name: "WAF", Description: "Веб-фильтр для приложений"},
+		{Key: "firewall", Name: "Firewall", Description: "Базовая сетевой фильтр Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию."},
+		{Key: "ids", Name: "IDS", Description: "Система обнаружения вторжений Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию."},
+		{Key: "waf", Name: "WAF", Description: "Веб-фильтр для приложений Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию."},
 	}
 
 	securityTask := ziva.NewMultiSelectTask("Минимальные требования безопасности мумолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.", securityItems).
@@ -223,7 +223,7 @@ func main() {
 			"Проверка соединения умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
 			func() error {
 				// return checkConnection(&data)
-				return errors.New("симуляция ошибки в середине выполнения очереди\nне ясная причина стимуляции проблемы\nдополнительная информация")
+				return errors.New("симуляция ошибки в середине выполнения очереди не ясная причина стимуляции проблемы дополнительная информация")
 			},
 			// Выводим краткую сводку под заголовком после успеха
 			ziva.WithSummaryFunction(func() []string {
