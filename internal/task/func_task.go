@@ -32,6 +32,8 @@ type FuncTask struct {
 	// successLabel отображается справа от заголовка при успешном завершении.
 	// По умолчанию значение равно "ГОТОВО", но может быть переопределено методом WithSuccessLabel.
 	successLabel string
+	// showSuccessLabel управляет выводом метки успешного завершения.
+	showSuccessLabel bool
 }
 
 /**
@@ -70,8 +72,28 @@ func WithSuccessLabelOption(label string) FuncTaskOption {
 	return func(t *FuncTask) {
 		if strings.TrimSpace(label) != "" {
 			t.successLabel = label
+			t.showSuccessLabel = true
 		}
 	}
+}
+
+/**
+ * @brief Управляет отображением метки успешного завершения.
+ * @param enabled true - отображать метку, false - скрывать.
+ * @return Функциональная опция для NewFuncTask.
+ */
+func WithSuccessLabelEnabledOption(enabled bool) FuncTaskOption {
+	return func(t *FuncTask) {
+		t.showSuccessLabel = enabled
+	}
+}
+
+/**
+ * @brief Отключает отображение метки успешного завершения.
+ * @return Функциональная опция для NewFuncTask.
+ */
+func WithoutSuccessLabelOption() FuncTaskOption {
+	return WithSuccessLabelEnabledOption(false)
 }
 
 /**
@@ -105,12 +127,13 @@ func NewFuncTask(title string, funcAction func() error, options ...FuncTaskOptio
 
 	// Создаем задачу с базовыми значениями
 	task := &FuncTask{
-		BaseTask:     baseTask,
-		spinner:      s,
-		function:     funcAction,
-		summaryFunc:  nil,
-		summaryLines: nil,
-		successLabel: defaults.DefaultSuccessLabel,
+		BaseTask:         baseTask,
+		spinner:          s,
+		function:         funcAction,
+		summaryFunc:      nil,
+		summaryLines:     nil,
+		successLabel:     defaults.DefaultSuccessLabel,
+		showSuccessLabel: true,
 	}
 
 	// Применяем функциональные опции
@@ -143,8 +166,24 @@ func (t *FuncTask) WithSummary(summaryFunc func() []string) *FuncTask {
 func (t *FuncTask) WithSuccessLabel(label string) *FuncTask {
 	if strings.TrimSpace(label) != "" {
 		t.successLabel = label
+		t.showSuccessLabel = true
 	}
 	return t
+}
+
+// WithSuccessLabelEnabled управляет отображением метки успешного завершения.
+// @param enabled true - отображать метку, false - скрывать.
+// @return Указатель на задачу для возможности цепочки вызовов.
+func (t *FuncTask) WithSuccessLabelEnabled(enabled bool) *FuncTask {
+	t.showSuccessLabel = enabled
+	return t
+}
+
+// WithoutSuccessLabel скрывает метку успешного завершения задачи.
+// Эквивалентно вызову WithSuccessLabelEnabled(false).
+// @return Указатель на задачу для возможности цепочки вызовов.
+func (t *FuncTask) WithoutSuccessLabel() *FuncTask {
+	return t.WithSuccessLabelEnabled(false)
 }
 
 /**
@@ -193,7 +232,11 @@ func (t *FuncTask) Update(msg tea.Msg) (Task, tea.Cmd) {
 		}
 
 		// Устанавливаем финальное значение для выравнивания по правому краю
-		t.finalValue = ui.SuccessLabelStyle.Render(t.successLabel)
+		if t.showSuccessLabel {
+			t.finalValue = ui.SuccessLabelStyle.Render(t.successLabel)
+		} else {
+			t.finalValue = ""
+		}
 		return t, nil
 	case error:
 		// Получили ошибку от функции, помечаем задачу как завершенную с ошибкой
@@ -235,7 +278,7 @@ func (t *FuncTask) Update(msg tea.Msg) (Task, tea.Cmd) {
 }
 
 /**
- * @brief Отображает текущее состояние задачи типа FuncTask.
+ * @brief Отображает активное состояние задачи типа FuncTask.
  * @param width Ширина области отображения.
  * @return Строка с визуализацией состояния задачи.
  */
@@ -243,18 +286,85 @@ func (t *FuncTask) View(width int) string {
 	if t.IsDone() {
 		return t.FinalView(width)
 	}
-	// Используем новый префикс для активной задачи
-	prefix := performance.FastConcat(
-		performance.RepeatEfficient(" ", ui.MainLeftIndent),
-		ui.TaskInProgressSymbol,
-		" ",
-	)
-	result := fmt.Sprintf("%s%s%s\n", prefix, t.spinner.View(), ui.ActiveTaskStyle.Render(t.title))
-	// Добавляем подсказку о навигации с новым отступом
-	helpIndent := performance.RepeatEfficient(" ", ui.MainLeftIndent)
-	result += "\n" + ui.DrawLine(width) + ui.SubtleStyle.Render(fmt.Sprintf("%s%s", helpIndent, defaults.TaskExitHint))
 
-	return result
+	// Базовый префикс активной задачи (учитывает нумерацию очереди)
+	basePrefix := t.InProgressPrefix()
+
+	// Добавляем спиннер перед заголовком
+	renderPrefix := strings.TrimRight(basePrefix, " ")
+	spinnerView := strings.TrimSpace(t.spinner.View())
+	if spinnerView != "" {
+		// Если есть спиннер, добавляем его перед заголовком
+		if renderPrefix != "" {
+			// Если есть префикс, добавляем его перед спиннером
+			renderPrefix = performance.FastConcat(renderPrefix, " ", spinnerView)
+		} else {
+			// Если нет префикса, добавляем только спиннер
+			renderPrefix = performance.FastConcat(spinnerView, " ")
+		}
+	}
+
+	// Формируем заголовок с переносами длинных строк и без вертикальной черты в продолжениях
+	header := renderTitleWithWrap(renderPrefix, t.title, ui.ActiveTitleStyle, t.RenderTimer(), width, false)
+	lines := strings.Split(header, "\n")
+	lines = normalizeActiveHeaderLines(lines, spinnerView)
+	header = strings.Join(lines, "\n")
+
+	var result strings.Builder
+	result.WriteString(header) // Выводим заголовок
+	result.WriteString("\n\n") // Добавляем отступ
+
+	// Базовая линия перед подсказкой выхода
+	result.WriteString(ui.DrawLine(width))
+
+	// Подсказка выхода
+	helpIndent := performance.RepeatEfficient(" ", ui.MainLeftIndent)
+	result.WriteString(ui.SubtleStyle.Render(fmt.Sprintf("%s%s", helpIndent, defaults.TaskExitHint)))
+
+	return result.String()
+}
+
+// normalizeActiveHeaderLines нормализует строки заголовка активной задачи
+// @param lines - строки заголовка
+// @param spinnerView - строка спиннера
+// @return []string - нормализованные строки заголовка
+func normalizeActiveHeaderLines(lines []string, spinnerView string) []string {
+	if len(lines) == 0 {
+		return lines
+	}
+
+	if len(lines) == 1 {
+		return lines
+	}
+
+	const continuationIndent = "      "
+	for i := 1; i < len(lines); i++ {
+		lines[i] = formatContinuationLine(lines[i], continuationIndent)
+	}
+
+	return lines
+}
+
+// formatContinuationLine форматирует строку продолжения заголовка
+// @param line - строка заголовка
+// @param indent - отступ
+// @return string - отформатированная строка
+func formatContinuationLine(line, indent string) string {
+	content := strings.TrimLeft(line, " ")
+	if content == "" {
+		return indent
+	}
+
+	if strings.HasPrefix(content, ui.VerticalLineSymbol) {
+		content = strings.TrimPrefix(content, ui.VerticalLineSymbol)
+		content = strings.TrimLeft(content, " ")
+	}
+
+	if content == "" {
+		return indent
+	}
+
+	return performance.FastConcat(indent, content)
 }
 
 /**
@@ -281,6 +391,8 @@ func (t *FuncTask) FinalView(width int) string {
 }
 
 // drawSummaryLines рисует дополнительные строки под заголовком задачи
+// @param width - ширина области отображения
+// @return string - строка с дополнительными строками
 func (t *FuncTask) drawSummaryLines(width int) string {
 
 	// Добавляем верхнюю разделительную линию
@@ -292,12 +404,6 @@ func (t *FuncTask) drawSummaryLines(width int) string {
 			result += ui.DrawSummaryLine(text_line, width) // Добавляем дополнительные строки с отступом
 		}
 	}
-
-	// Добавляем нижнюю разделительную линию
-	// result += performance.FastConcat(
-	// 	performance.RepeatEfficient(" ", ui.MainLeftIndent),
-	// 	ui.VerticalLineSymbol,
-	// )
 
 	return result
 }

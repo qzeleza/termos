@@ -30,6 +30,35 @@ task := ziva.NewFuncTask(
 )
 ```
 
+### Controlling the completion label
+
+By default a completed `FuncTask` renders a “DONE” badge on the right.
+
+```go
+task := ziva.NewFuncTask("Build", build).
+    WithSuccessLabel("FINISHED") // custom text
+```
+
+Hide the badge completely when it is not needed:
+
+```go
+task := ziva.NewFuncTask("Background setup", prepare).
+    WithoutSuccessLabel()
+```
+
+You can achieve the same result with functional options passed to the constructor:
+
+```go
+task := ziva.NewFuncTask(
+    "Import data",
+    importData,
+    ziva.WithoutSuccessLabelOption(),       // disable the badge
+    ziva.WithSummaryFunction(renderSummary),
+)
+```
+
+Later you may re-enable the badge with `WithSuccessLabelEnabled(true)` or swap the text using `WithSuccessLabel(...)`.
+
 ## Example with Report
 
 ```go

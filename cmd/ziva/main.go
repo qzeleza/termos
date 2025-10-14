@@ -3,7 +3,6 @@ package main
 import (
 	// Встроенные импорты не требуются
 
-	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -220,10 +219,11 @@ func main() {
 	if errorTaskRun {
 		data := pingResult{}
 		fn = ziva.NewFuncTask(
-			"Проверка соединения умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.",
+			"Проверка соединения умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию. проверены все подсистемы и подготовлены рекомендации для последующих шагов. Пожалуйста, просмотрите сводку, чтобы увидеть форматирование длинного",
 			func() error {
-				// return checkConnection(&data)
-				return errors.New("симуляция ошибки в середине выполнения очереди не ясная причина стимуляции проблемы дополнительная информация")
+				time.Sleep(15 * time.Second)
+				return checkConnection(&data)
+				// return errors.New("симуляция ошибки в середине выполнения очереди не ясная причина стимуляции проблемы дополнительная информация")
 			},
 			// Выводим краткую сводку под заголовком после успеха
 			ziva.WithSummaryFunction(func() []string {
@@ -232,6 +232,7 @@ func main() {
 					"Потери пакетов: " + data.Loss,
 				}
 			}),
+			ziva.WithSuccessLabelEnabledOption(false),
 			// Не останавливать очередь при ошибке (для демонстрации поведения)
 			ziva.WithStopOnError(false),
 		)
@@ -256,13 +257,13 @@ func main() {
 	inDefault.WithPlaceholder("значение по умолчанию Оставьте пустым и нажмите → или Enter, чтобы принять значение по умолчанию.")
 
 	queue.AddTasks(
-		inDefault,
+		// ms1,
+		// inDefault,
 		fn,
-		securityTask,
-		ys,
-		ms1,
-		diagnosticsTask,
-		inRequired,
+		// securityTask,
+		// ys,
+		// diagnosticsTask,
+		// inRequired,
 	)
 
 	// очередь-заглушка, сюда добавляем задачи, которые не ходим пока чтобы они выполнялись

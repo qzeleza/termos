@@ -1153,7 +1153,7 @@ func (t *MultiSelectTask) View(width int) string {
 	// Получаем отформатированный таймер (если он активен)
 	timerStr := t.RenderTimer()
 
-	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTaskStyle, timerStr, width)
+	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTaskStyle, timerStr, width, true)
 	sb.WriteString(header)
 	sb.WriteString("\n")
 

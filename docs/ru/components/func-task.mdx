@@ -53,6 +53,35 @@ task := ziva.NewFuncTask("Проверка кластера", func() error {
 
 Сводка выводится сразу под заголовком задачи после успешного выполнения.
 
+### Управление меткой завершения
+
+По умолчанию `FuncTask` выводит статус «ГОТОВО» справа от заголовка.
+
+```go
+task := ziva.NewFuncTask("Сборка", build).
+    WithSuccessLabel("ВЫПОЛНЕНО") // собственная метка
+```
+
+Чтобы полностью скрыть статус, используйте метод `WithoutSuccessLabel()`:
+
+```go
+task := ziva.NewFuncTask("Фоновая подготовка", prepare).
+    WithoutSuccessLabel()
+```
+
+Эквивалентную настройку можно передать через опции конструктора:
+
+```go
+task := ziva.NewFuncTask(
+    "Импорт данных",
+    importData,
+    ziva.WithoutSuccessLabelOption(),        // выключить метку
+    ziva.WithSummaryFunction(renderSummary), // дополнительные строки
+)
+```
+
+Позже статус можно снова включить вызовом `WithSuccessLabelEnabled(true)` или установить новую подпись через `WithSuccessLabel(...)`.
+
 ## Комбинирование с другими задачами
 
 ```go

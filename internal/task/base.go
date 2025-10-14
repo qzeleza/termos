@@ -213,14 +213,14 @@ func (t *BaseTask) FinalView(width int) string {
 		} else {
 			right = ui.GetErrorStatusStyle().Render(t.finalValue)
 		}
-		return renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
+		return renderTitleWithWrap(prefix, t.title, titleStyle, right, width, true)
 	}
 
 	// Для ошибок выводим текст ошибки с отступом и слово "Ошибка" справа
 	if t.icon == ui.IconError {
 		titleStyle := ui.GetErrorStatusStyle()
 		right := ui.GetErrorStatusStyle().Render(defaults.TaskStatusError)
-		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
+		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width, true)
 
 		var result strings.Builder
 		result.WriteString(header)
@@ -264,7 +264,7 @@ func (t *BaseTask) FinalView(width int) string {
 		// Формируем правую часть заголовка
 		right := statusStyle.Render(statusLabel)
 		// Формируем заголовок
-		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
+		header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width, true)
 
 		// Формируем основной текст
 		var result strings.Builder
@@ -306,7 +306,7 @@ func (t *BaseTask) FinalView(width int) string {
 	if !success {
 		titleStyle = ui.GetErrorStatusStyle()
 	}
-	return renderTitleWithWrap(prefix, t.title, titleStyle, "", width)
+	return renderTitleWithWrap(prefix, t.title, titleStyle, "", width, true)
 }
 
 // renderTitleWithWrap отображает заголовок с префиксом и правым текстом
@@ -315,9 +315,13 @@ func (t *BaseTask) FinalView(width int) string {
 // @param titleStyle - стиль заголовка
 // @param right - правый текст
 // @param width - ширина
+// @param autoSpacing - добавлять ли автоматически завершающие пробелы к префиксу
 // @return string - отформатированный заголовок
-func renderTitleWithWrap(prefix, title string, titleStyle lipgloss.Style, right string, width int) string {
-	titlePrefix := ensurePrefixSpacing(prefix)                      // добавляет отступы к префиксу
+func renderTitleWithWrap(prefix, title string, titleStyle lipgloss.Style, right string, width int, autoSpacing bool) string {
+	titlePrefix := prefix
+	if autoSpacing {
+		titlePrefix = ensurePrefixSpacing(prefix)
+	}
 	continuationPrefix := buildContinuationTitlePrefix(titlePrefix) // создает префикс для продолжения заголовка
 
 	// вычисляет эффективную ширину
@@ -357,7 +361,7 @@ func renderTitleWithWrap(prefix, title string, titleStyle lipgloss.Style, right 
 		wrapped = []string{""}
 	}
 
-	// формирует заголовок
+	// формирует заголовок первоначальной строки
 	firstLeft := titlePrefix + titleStyle.Render(wrapped[0])
 	header := ui.AlignTextToRight(firstLeft, right, width) // выравнивает заголовок по правому краю
 

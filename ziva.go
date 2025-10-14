@@ -42,6 +42,60 @@ import (
 	"github.com/qzeleza/ziva/internal/validation"
 )
 
+// Валидаторы - экспорт фабрики валидаторов
+var DefaultValidators = validation.DefaultFactory
+
+// FuncTaskOption представляет опцию для конфигурации FuncTask
+type FuncTaskOption = task.FuncTaskOption
+
+// Опции для FuncTask
+var (
+	WithSummaryFunction           = task.WithSummaryFunction           // @brief Устанавливает функцию для формирования подсказки
+	WithStopOnError               = task.WithStopOnError               // @brief Устанавливает функцию для формирования подсказки
+	WithSuccessLabelOption        = task.WithSuccessLabelOption        // @brief Переопределяет метку успешного завершения
+	WithSuccessLabelEnabledOption = task.WithSuccessLabelEnabledOption // @brief Управляет отображением метки успешного завершения
+	WithoutSuccessLabelOption     = task.WithoutSuccessLabelOption     // @brief Отключает метку успешного завершения
+)
+
+// Стили для текста
+var (
+	ErrorStatusStyle   = ui.ErrorStatusStyle   // @brief Стиль для отображения ошибки
+	ErrorMessageStyle  = ui.ErrorMessageStyle  // @brief Стиль для отображения ошибки
+	CancelStyle        = ui.CancelStyle        // @brief Стиль для отображения ошибки
+	SubtleStyle        = ui.SubtleStyle        // @brief Стиль для отображения ошибки
+	SelectionStyle     = ui.SelectionStyle     // @brief Стиль для отображения ошибки
+	SelectionNoStyle   = ui.SelectionNoStyle   // @brief Стиль для отображения ошибки
+	ActiveStyle        = ui.ActiveStyle        // @brief Стиль для отображения ошибки
+	InputStyle         = ui.InputStyle         // @brief Стиль для отображения ошибки
+	SpinnerStyle       = ui.SpinnerStyle       // @brief Стиль для отображения ошибки
+	ActiveTitleStyle   = ui.ActiveTitleStyle   // @brief Стиль для отображения ошибки
+	ActiveTaskStyle    = ui.ActiveTaskStyle    // @brief Стиль для отображения ошибки
+	SuccessLabelStyle  = ui.SuccessLabelStyle  // @brief Стиль для отображения ошибки
+	FinishedLabelStyle = ui.FinishedLabelStyle // @brief Стиль для отображения ошибки
+)
+
+// Коды цветов
+var (
+	GreenBright   = ui.ColorBrightGreen   // @brief Яркий зеленый
+	RedBright     = ui.ColorBrightRed     // @brief Яркий красный
+	RedDark       = ui.ColorDarkRed       // @brief Тёмный красный
+	YellowBright  = ui.ColorBrightYellow  // @brief Яркий желтый
+	YellowDark    = ui.ColorDarkYellow    // @brief Тёмный желтый
+	OrangeBright  = ui.ColorBrightOrange  // @brief Яркий оранжевый
+	OrangeDark    = ui.ColorDarkOrange    // @brief Тёмный оранжевый
+	BlueBright    = ui.ColorBrightBlue    // @brief Яркий синий
+	BlueDark      = ui.ColorDarkBlue      // @brief Тёмный синий
+	CyanBright    = ui.ColorBrightCyan    // @brief Яркий голубой
+	CyanDark      = ui.ColorDarkCyan      // @brief Тёмный голубой
+	MagentaBright = ui.ColorBrightMagenta // @brief Яркий фиолетовый
+	WhiteBright   = ui.ColorBrightWhite   // @brief Яркий белый
+	GrayBright    = ui.ColorBrightGray    // @brief Яркий серый
+	GrayDark      = ui.ColorDarkGray      // @brief Тёмный серый
+	LightBlue     = ui.ColorLightBlue     // @brief Яркий голубой
+	Black         = ui.ColorBlack         // @brief Тёмный чёрный
+	DarkGreen     = ui.ColorDarkGreen     // @brief Тёмный зеленый
+)
+
 // Task представляет собой интерфейс для выполнения задач в очереди.
 // Этот интерфейс используется как в пакете task, так и в пакете query.
 type Task = common.Task
@@ -620,57 +674,6 @@ func (t *FuncTask) WithStopOnError(stop bool) *FuncTask {
 	t.SetStopOnError(stop)
 	return t
 }
-
-// Валидаторы - экспорт фабрики валидаторов
-var DefaultValidators = validation.DefaultFactory
-
-// FuncTaskOption представляет опцию для конфигурации FuncTask
-type FuncTaskOption = task.FuncTaskOption
-
-// Опции для FuncTask
-var (
-	WithSummaryFunction = task.WithSummaryFunction
-	WithStopOnError     = task.WithStopOnError
-)
-
-// Стили для текста
-var (
-	ErrorStatusStyle   = ui.ErrorStatusStyle
-	ErrorMessageStyle  = ui.ErrorMessageStyle
-	CancelStyle        = ui.CancelStyle
-	SubtleStyle        = ui.SubtleStyle
-	SelectionStyle     = ui.SelectionStyle
-	SelectionNoStyle   = ui.SelectionNoStyle
-	ActiveStyle        = ui.ActiveStyle
-	InputStyle         = ui.InputStyle
-	SpinnerStyle       = ui.SpinnerStyle
-	ActiveTitleStyle   = ui.ActiveTitleStyle
-	ActiveTaskStyle    = ui.ActiveTaskStyle
-	SuccessLabelStyle  = ui.SuccessLabelStyle
-	FinishedLabelStyle = ui.FinishedLabelStyle
-)
-
-// Коды цветов
-var (
-	GreenBright   = ui.ColorBrightGreen
-	RedBright     = ui.ColorBrightRed
-	RedDark       = ui.ColorDarkRed
-	YellowBright  = ui.ColorBrightYellow
-	YellowDark    = ui.ColorDarkYellow
-	OrangeBright  = ui.ColorBrightOrange
-	OrangeDark    = ui.ColorDarkOrange
-	BlueBright    = ui.ColorBrightBlue
-	BlueDark      = ui.ColorDarkBlue
-	CyanBright    = ui.ColorBrightCyan
-	CyanDark      = ui.ColorDarkCyan
-	MagentaBright = ui.ColorBrightMagenta
-	WhiteBright   = ui.ColorBrightWhite
-	GrayBright    = ui.ColorBrightGray
-	GrayDark      = ui.ColorDarkGray
-	LightBlue     = ui.ColorLightBlue
-	Black         = ui.ColorBlack
-	DarkGreen     = ui.ColorDarkGreen
-)
 
 // ----------------------------------------------------------------------------
 // Автоконфигурация для встроенных систем

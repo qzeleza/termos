@@ -562,7 +562,7 @@ func (t *SingleSelectTask) View(width int) string {
 	timerStr := t.RenderTimer()
 
 	// Формируем заголовок задачи
-	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTitleStyle, timerStr, width)
+	header := renderTitleWithWrap(titlePrefix, t.title, ui.ActiveTitleStyle, timerStr, width, true)
 	sb.WriteString(header)
 	sb.WriteString("\n")
 

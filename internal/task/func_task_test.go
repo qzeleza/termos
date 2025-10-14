@@ -4,9 +4,11 @@ package task
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/qzeleza/ziva/internal/defaults"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,6 +62,20 @@ func TestFuncTaskWithSuccessLabel(t *testing.T) {
 	// Проверяем, что финальное представление содержит метку успеха
 	finalView := updatedTask.FinalView(80)
 	assert.Contains(t, finalView, "ГОТОВО", "Финальное представление должно содержать метку успешного завершения")
+}
+
+// TestFuncTaskWithoutSuccessLabel проверяет отключение метки успешного завершения
+func TestFuncTaskWithoutSuccessLabel(t *testing.T) {
+	funcTask := NewFuncTask("Без статуса", func() error {
+		return nil
+	})
+
+	funcTask = funcTask.WithoutSuccessLabel()
+
+	updatedTask, _ := funcTask.Update(funcTaskCompleteMsg{})
+	finalView := updatedTask.FinalView(80)
+
+	assert.NotContains(t, finalView, strings.ToUpper(defaults.DefaultSuccessLabel), "Финальное представление не должно содержать метку успешного завершения")
 }
 
 // TestFuncTaskSuccessfulExecution проверяет успешное выполнение задачи

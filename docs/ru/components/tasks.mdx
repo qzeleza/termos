@@ -108,7 +108,7 @@ confirm := ziva.NewYesNoTask("Подтверждение", "Продолжить
 mode    := ziva.NewSingleSelectTask("Режим", modes)
 features := ziva.NewMultiSelectTask("Фичи", featureList)
 name     := ziva.NewInputTask("Имя", "Введите имя кластера")
-build    := ziva.NewFuncTask("Сборка", assembleCluster)
+build    := ziva.NewFuncTask("Сборка", assembleCluster).WithoutSuccessLabel()
 
 queue.AddTasks(confirm, mode, features, name, build)
 if err := queue.Run(); err != nil {
@@ -126,6 +126,7 @@ if confirm.IsYes() {
 - **Используйте таймауты аккуратно.** Всегда выбирайте fallback, безопасный для вашей системы.
 - **Показывайте подсказки.** Разделитель помогает объяснить значения вроде `prod`, `staging`, `cli`.
 - **Не дублируйте вывод.** Ziva сам управляет TUI-рендерингом; избегайте `fmt.Println` внутри задач.
+- **Убирайте метку завершения, если она не нужна.** Для `FuncTask` используйте `WithoutSuccessLabel()` или опцию `WithoutSuccessLabelOption()`, чтобы скрыть подпись «ГОТОВО».
 - **Сохраняйте ссылки на задачи.** Это единственный способ получить результаты после завершения очереди.
 
 Продолжайте с подробным описанием конкретных задач в соответствующих разделах.

@@ -190,7 +190,7 @@ func (t *YesNoTask) FinalView(width int) string {
 		}
 	}
 
-	header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width)
+	header := renderTitleWithWrap(prefix, t.title, titleStyle, right, width, true)
 
 	var builder strings.Builder
 	builder.WriteString(header)

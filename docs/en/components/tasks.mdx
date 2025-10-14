@@ -100,7 +100,7 @@ input := ziva.NewInputTask("Title", "Prompt:")
 fn := ziva.NewFuncTask("Title", func() error {
     // perform work
     return nil
-})
+}).WithoutSuccessLabel() // hide the default “DONE” badge when not needed
 ```
 
 ### Method Chaining

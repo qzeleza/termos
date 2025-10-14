@@ -60,7 +60,7 @@ func (r *InputRenderer) RenderInput(title string, textInput textinput.Model, val
 	if len(timerStr) > 0 && timerStr[0] != "" {
 		timer = ui.SubtleStyle.Render(timerStr[0])
 	}
-	titleView := renderTitleWithWrap(prefix, title, ui.ActiveTaskStyle, timer, width)
+	titleView := renderTitleWithWrap(prefix, title, ui.ActiveTaskStyle, timer, width, true)
 
 	// Получаем текст ввода с применением стиля
 	inputView := r.style.Render(textInput.View())
@@ -189,7 +189,7 @@ func (r *InputRenderer) RenderFinal(title string, value string, hasError bool, e
 	}
 
 	rightPart := statusStyle.Render(valueToShow)
-	header := renderTitleWithWrap(prefix, title, titleStyle, rightPart, width)
+	header := renderTitleWithWrap(prefix, title, titleStyle, rightPart, width, true)
 
 	if value != "" {
 		valuePrefix := performance.FastConcat(
